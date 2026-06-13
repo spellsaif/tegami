@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { filterChangelogsByIds, type TegamiContext } from "./context";
 import { simpleGenerator } from "./generators/simple";
 import { BumpType, bumpVersion, maxBump, updateRange } from "./utils/semver";
-import { PackageGraph, type WorkspacePackage, writeManifest } from "./workspace";
+import { type WorkspacePackage, writeManifest } from "./workspace";
 import {
   publishPlanSchema,
   type ChangelogEntry,

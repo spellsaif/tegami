@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { x } from "tinyexec";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { tegami } from "../src";
-import { createTegamiContext } from "../src/context";
+import { createTegamiContext, TegamiContext } from "../src/context";
 import type { PublishOptions } from "../src/publish";
 import { publishFromPlan } from "../src/publish";
 import { publishPlanSchema } from "../src/schemas";
@@ -32,9 +32,13 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
-        dryRun: true,
+      await createTegamiContext({
+        cwd,
+        planPath,
       }),
+      {
+        dryRun: true,
+      },
     );
 
     expect(result.state).toBe("success");
@@ -56,11 +60,15 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
-        dryRun: false,
-        gitTags: false,
+      await createTegamiContext({
+        cwd,
+        planPath,
         npmClient: "npm",
       }),
+      {
+        dryRun: false,
+        gitTags: false,
+      },
     );
 
     expect(result.state).toBe("success");
@@ -120,9 +128,11 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
-        dryRun: true,
+      await createTegamiContext({
+        cwd,
+        planPath,
       }),
+      { dryRun: true },
     );
 
     expect(result.packages[0]?.changelogs).toEqual(plan.changelogs);
@@ -154,7 +164,9 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
+      await createTegamiContext({
+        cwd,
+        planPath,
         npmClient: "npm",
       }),
     );
@@ -193,9 +205,19 @@ describe("publish plans", () => {
         },
       }),
     );
-    expect(exec).toHaveBeenNthCalledWith(5, "git", ["rev-parse", "-q", "--verify", "refs/tags/@acme/core@1.0.1"], expect.any(Object));
+    expect(exec).toHaveBeenNthCalledWith(
+      5,
+      "git",
+      ["rev-parse", "-q", "--verify", "refs/tags/@acme/core@1.0.1"],
+      expect.any(Object),
+    );
     expect(exec).toHaveBeenNthCalledWith(6, "git", ["tag", "@acme/core@1.0.1"], expect.any(Object));
-    expect(exec).toHaveBeenNthCalledWith(7, "git", ["rev-parse", "-q", "--verify", "refs/tags/@acme/ui@1.0.1"], expect.any(Object));
+    expect(exec).toHaveBeenNthCalledWith(
+      7,
+      "git",
+      ["rev-parse", "-q", "--verify", "refs/tags/@acme/ui@1.0.1"],
+      expect.any(Object),
+    );
     expect(exec).toHaveBeenNthCalledWith(8, "git", ["tag", "@acme/ui@1.0.1"], expect.any(Object));
   });
 
@@ -224,7 +246,9 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
+      await createTegamiContext({
+        cwd,
+        planPath,
         npmClient: "npm",
       }),
     );
@@ -260,11 +284,15 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
-        dryRun: false,
-        gitTags: false,
+      await createTegamiContext({
+        cwd,
+        planPath,
         npmClient: "pnpm",
       }),
+      {
+        dryRun: false,
+        gitTags: false,
+      },
     );
 
     expect(result.state).toBe("success");
@@ -316,11 +344,15 @@ describe("publish plans", () => {
 
     const result = await publishFixture(
       planPath,
-      await createPublishContext(cwd, planPath, {
-        dryRun: false,
-        gitTags: false,
+      await createTegamiContext({
+        cwd,
+        planPath,
         npmClient: "npm",
       }),
+      {
+        dryRun: false,
+        gitTags: false,
+      },
     );
 
     expect(result.state).toBe("success");
@@ -449,19 +481,16 @@ function packageRelease(name: string) {
   };
 }
 
-function createPublishContext(cwd: string, planPath: string, publish?: PublishOptions) {
-  return createTegamiContext({
-    cwd,
-    planPath,
-    publish,
-  });
-}
-
 async function publishFixture(
   planPath: string,
-  context: Awaited<ReturnType<typeof createTegamiContext>>,
+  context: TegamiContext,
+  PublishOptions: PublishOptions = {},
 ) {
-  return publishFromPlan(context, await publishPlanSchema.decode(await readFile(planPath, "utf8")));
+  return publishFromPlan(
+    context,
+    publishPlanSchema.decode(await readFile(planPath, "utf8")),
+    PublishOptions,
+  );
 }
 
 async function readJson<T>(path: string): Promise<T> {

@@ -3,7 +3,7 @@ import { createTegamiContext } from "./context";
 import { DraftPlan, createDraftPlan } from "./draft";
 import { readChangelogEntries } from "./markdown";
 import { publishFromPlan } from "./publish";
-import type { PublishResult } from "./publish";
+import type { PublishOptions, PublishResult } from "./publish";
 import type { TegamiOptions } from "./types";
 import { isNodeError } from "./utils/error";
 import { PackageGraph } from "./workspace";
@@ -22,7 +22,7 @@ export interface Tegami {
   /** Discover workspace packages and their dependency relationships. */
   graph(): Promise<PackageGraph>;
   /** Publish the current publish plan. */
-  publish(): Promise<PublishResult>;
+  publish(options?: PublishOptions): Promise<PublishResult>;
 }
 
 /** Create a Tegami project handle. */
@@ -44,7 +44,7 @@ export function tegami(options: TegamiOptions = {}): Tegami {
       return (await createTegamiContext(options)).graph;
     },
 
-    async publish() {
+    async publish(publishOptions) {
       const context = await createTegamiContext(options);
       const parsed = await readFile(context.planPath, "utf8")
         .then((content) => publishPlanSchema.decode(content))
@@ -57,7 +57,7 @@ export function tegami(options: TegamiOptions = {}): Tegami {
         throw new Error(`No publish plan found at ${context.planPath}.`);
       }
 
-      const result = await publishFromPlan(context, parsed);
+      const result = await publishFromPlan(context, parsed, publishOptions);
 
       for (const plugin of options.plugins ?? []) {
         await plugin.afterPublish?.(result);

@@ -16,9 +16,7 @@ describe("tegami context", () => {
   test("uses an explicit npm client without detecting", async () => {
     const context = await createTegamiContext({
       cwd: "/repo",
-      publish: {
-        npmClient: "npm",
-      },
+      npmClient: "npm",
     });
 
     expect(context.npmClient).toBe("npm");

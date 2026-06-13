@@ -27,8 +27,9 @@ export interface TegamiOptions {
   /** Per-package release and publish options keyed by package name. */
   packages?: Record<string, PackageOptions>;
   plugins?: TegamiPlugin[];
-  /** Publish-time options. */
-  publish?: PublishOptions;
+
+  /** Package manager command used for npm registry operations. */
+  npmClient?: NpmClient;
 }
 
 export interface TegamiPlugin {

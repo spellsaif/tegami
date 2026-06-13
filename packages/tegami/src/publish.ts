@@ -2,13 +2,10 @@ import { x } from "tinyexec";
 import { filterChangelogsByIds, type TegamiContext } from "./context";
 import { ChangelogEntry, PublishPlan } from "./schemas";
 import { createGitTag } from "./utils/git";
-import type { NpmClient } from "./types";
 
 export interface PublishOptions {
   /** Validate the publish plan without publishing packages, creating tags, or running release plugins. */
   dryRun?: boolean;
-  /** Package manager command used for npm registry operations. */
-  npmClient?: NpmClient;
   /** Set to false to skip creating git tags after all packages publish successfully. */
   gitTags?: boolean;
 }
@@ -40,8 +37,9 @@ export type PackagePublishResult = (
 export async function publishFromPlan(
   context: TegamiContext,
   plan: PublishPlan,
+  options: PublishOptions = {},
 ): Promise<PublishResult> {
-  const packages = await publishStoredPlan(plan, context);
+  const packages = await publishStoredPlan(plan, context, options);
   const result: PublishResult = {
     plan,
     planPath: context.planPath,
@@ -49,12 +47,13 @@ export async function publishFromPlan(
     packages,
   };
 
-  return createGitTags(plan, context, result);
+  return createGitTags(context, result, options);
 }
 
 async function publishStoredPlan(
   plan: PublishPlan,
   context: TegamiContext,
+  { dryRun = false }: PublishOptions,
 ): Promise<PackagePublishResult[]> {
   const results: PackagePublishResult[] = [];
 
@@ -64,7 +63,7 @@ async function publishStoredPlan(
     if (!pkg) continue;
     const changelogs = filterChangelogsByIds(plan.changelogs, packagePlan.changelogIds);
 
-    if (!context.publish.dryRun) {
+    if (!dryRun) {
       const published = await context.registryClient.packageVersionExists(
         packagePlan.name,
         packagePlan.version,
@@ -96,7 +95,7 @@ async function publishStoredPlan(
         );
       }
 
-      if (!context.publish.dryRun) {
+      if (!dryRun) {
         const args = ["publish", "--tag", packagePlan.distTag];
 
         await x(context.npmClient, args, {
@@ -132,15 +131,14 @@ async function publishStoredPlan(
 }
 
 async function createGitTags(
-  plan: PublishPlan,
   context: TegamiContext,
   result: PublishResult,
+  { dryRun = false, gitTags = true }: PublishOptions,
 ): Promise<PublishResult> {
-  const { publish: publishConfig, graph } = context;
-  if (publishConfig.dryRun || publishConfig.gitTags === false || result.state === "failed")
-    return result;
+  const { graph } = context;
+  if (dryRun || !gitTags || result.state === "failed") return result;
 
-  for (const release of plan.packages) {
+  for (const release of result.plan.packages) {
     if (!release.publish || !release.gitTag) continue;
 
     try {
