@@ -1,0 +1,131 @@
+import { x } from "tinyexec";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { PublishResult } from "../src";
+import { githubRelease } from "../src/plugins/github";
+
+vi.mock("tinyexec", () => ({
+  x: vi.fn(),
+}));
+
+const exec = vi.mocked(x);
+
+beforeEach(() => {
+  exec.mockReset();
+});
+
+describe("github release plugin", () => {
+  test("creates GitHub releases for successful published packages", async () => {
+    const plugin = githubRelease({
+      repo: "acme/repo",
+      prerelease: (pkg) => pkg.distTag !== "latest",
+      title: (pkg) => `Release ${pkg.version}`,
+      notes: (pkg) => `Notes for ${pkg.name}`,
+    });
+
+    await plugin.afterPublish?.(
+      publishResult({
+        packages: [
+          packageResult({
+            distTag: "alpha",
+            gitTag: "@acme/core@1.0.1",
+          }),
+          packageResult({
+            name: "@acme/no-tag",
+            gitTag: false,
+          }),
+        ],
+      }),
+    );
+
+    expect(exec).toHaveBeenCalledTimes(1);
+    expect(exec).toHaveBeenCalledWith(
+      "gh",
+      [
+        "release",
+        "create",
+        "@acme/core@1.0.1",
+        "--title",
+        "Release 1.0.1",
+        "--notes",
+        "Notes for @acme/core",
+        "--repo",
+        "acme/repo",
+        "--prerelease",
+      ],
+      {
+        throwOnError: true,
+      },
+    );
+  });
+
+  test("does not create releases when any package failed", async () => {
+    const plugin = githubRelease();
+
+    await plugin.afterPublish?.(
+      publishResult({
+        state: "failed",
+        packages: [
+          packageResult(),
+          packageResult({
+            name: "@acme/ui",
+            state: "failed",
+          }),
+        ],
+      }),
+    );
+
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  test("uses changelog entries for default notes", async () => {
+    const plugin = githubRelease();
+
+    await plugin.afterPublish?.(
+      publishResult({
+        packages: [
+          packageResult({
+            changelogs: [
+              {
+                file: "/repo/.tegami/change.md",
+                packages: ["core"],
+                type: "minor",
+                title: "Add proxy server",
+                content: "Some description.",
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(exec).toHaveBeenCalledWith(
+      "gh",
+      expect.arrayContaining(["--notes", "### Add proxy server\n\nSome description."]),
+      expect.any(Object),
+    );
+  });
+});
+
+function publishResult(overrides: Partial<PublishResult> = {}): PublishResult {
+  return {
+    planPath: "/repo/.tegami/publish-plan.json",
+    state: "success",
+    packages: [],
+    ...overrides,
+  };
+}
+
+function packageResult(
+  overrides: Partial<PublishResult["packages"][number]> = {},
+): PublishResult["packages"][number] {
+  return {
+    name: "@acme/core",
+    path: "/repo/packages/core",
+    version: "1.0.1",
+    distTag: "latest",
+    changelogs: [],
+    gitTag: "@acme/core@1.0.1",
+    state: "success",
+    ...overrides,
+  };
+}
