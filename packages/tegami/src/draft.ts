@@ -19,6 +19,7 @@ export interface PackageOptions {
 export interface PackagePlan {
   type: BumpType;
   changelogIds: Set<string>;
+  fromVersion: string;
   distTag?: string;
   publish: boolean;
 }
@@ -43,9 +44,11 @@ export class DraftPlan {
   }
 
   setPackage(id: string, plan: Partial<PackagePlan> = {}) {
+    const pkg = this.context.graph.get(id);
     this.packages.set(id, {
       ...plan,
       changelogIds: plan.changelogIds ?? new Set(),
+      fromVersion: plan.fromVersion ?? pkg?.version ?? "0.0.0",
       publish: plan.publish ?? true,
       type: plan.type ?? "patch",
     });
@@ -263,6 +266,7 @@ function createPackagePlan(
   return {
     type,
     changelogIds,
+    fromVersion: pkg.version,
     distTag: packageOptions.distTag ?? pkg.distTag,
     publish: packageOptions.publish ?? pkg.publish,
   };

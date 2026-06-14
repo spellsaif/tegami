@@ -171,7 +171,10 @@ describe("publish plans", () => {
 
       if (args.at(0) === "publish") {
         const cwd = options.nodeOptions?.cwd;
-        if (typeof cwd === "string" && normalizeDirPath(cwd).endsWith("packages/ui")) {
+        if (
+          typeof cwd === "string" &&
+          normalizeDirPath(cwd).replace(/\\/g, "/").endsWith("packages/ui")
+        ) {
           throw new Error("publish failed");
         }
 
@@ -301,6 +304,7 @@ Not versioned yet.
         "npm:@acme/core": {
           type: "patch",
           changelogIds: [],
+          fromVersion: "1.0.0",
           distTag: "latest",
           publish: false,
         },
@@ -354,6 +358,7 @@ async function createPublishFixture(options: { registry?: string } = {}): Promis
       "npm:@acme/core": {
         type: "patch",
         changelogIds: [],
+        fromVersion: "1.0.0",
         distTag: "latest",
         publish: true,
       },
@@ -415,6 +420,7 @@ function packageRelease() {
   return {
     type: "patch",
     changelogIds: [] as string[],
+    fromVersion: "1.0.0",
     distTag: "latest",
     publish: true,
   };

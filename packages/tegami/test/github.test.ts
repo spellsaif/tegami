@@ -499,6 +499,7 @@ function versionDraft(context = publishContext()): DraftPlan {
       {
         type: "minor",
         changelogIds: new Set(["change-1"]),
+        fromVersion: "1.0.0",
         publish: true,
       },
     ],

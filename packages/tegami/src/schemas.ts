@@ -82,6 +82,7 @@ export const planStoreSchema = jsonCodec(
           encode: (v) => Array.from(v),
           decode: (v) => new Set(v),
         }),
+        fromVersion: z.string(),
         distTag: z.string().optional(),
         publish: z.boolean(),
       }),

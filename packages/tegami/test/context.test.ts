@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { detect } from "package-manager-detector";
 import { x } from "tinyexec";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -39,7 +40,7 @@ describe("tegami context", () => {
 
     expect(exec).toHaveBeenCalledWith("npm", ["view", "@acme/core@1.0.0", "version", "--json"], {
       nodeOptions: {
-        cwd: "/repo",
+        cwd: resolve("/repo"),
       },
     });
     expect(detectPackageManager).not.toHaveBeenCalled();
@@ -61,12 +62,12 @@ describe("tegami context", () => {
 
     expect(exec).toHaveBeenCalledWith("pnpm", ["view", "@acme/core@1.0.0", "version", "--json"], {
       nodeOptions: {
-        cwd: "/repo",
+        cwd: resolve("/repo"),
       },
     });
     expect(detectPackageManager).toHaveBeenCalledTimes(1);
     expect(detectPackageManager).toHaveBeenCalledWith({
-      cwd: "/repo",
+      cwd: resolve("/repo"),
     });
   });
 
