@@ -15,5 +15,10 @@ await createCli(
         repo: "fuma-nama/tegami",
       }),
     ],
+    packages: {
+      "npm:tegami": {
+        distTag: "beta",
+      },
+    },
   }),
 ).parseAsync();
