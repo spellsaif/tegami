@@ -26,6 +26,7 @@ export interface PackagePlan {
 
 export class DraftPlan {
   #created = false;
+  #mergedExisting = false;
 
   constructor(
     // id -> changelog
@@ -34,6 +35,14 @@ export class DraftPlan {
     private readonly packages: Map<string, PackagePlan>,
     private readonly context: TegamiContext,
   ) {}
+
+  markMergedExisting() {
+    this.#mergedExisting = true;
+  }
+
+  isMergedExisting() {
+    return this.#mergedExisting;
+  }
 
   getPackageIds() {
     return Array.from(this.packages.keys());
@@ -112,6 +121,8 @@ export class DraftPlan {
   }
 
   private async assertPublishPlanFinished(): Promise<void> {
+    if (this.#mergedExisting) return;
+
     const content = await readFile(this.context.planPath, "utf8").catch(() => undefined);
     if (!content) return;
 
@@ -136,7 +147,7 @@ export class DraftPlan {
 
       updatedPackages.set(id, {
         plan,
-        version: bumpVersion(pkg.version, plan.type),
+        version: bumpVersion(plan.fromVersion, plan.type),
       });
     }
 

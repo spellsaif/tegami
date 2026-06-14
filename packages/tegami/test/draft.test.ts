@@ -198,9 +198,15 @@ describe("draft publish plans", () => {
     ).toMatchFileSnapshot("./__snapshots__/custom-generator-changelog.md");
   });
 
-  test("blocks new publish plans until the existing plan is finished", async () => {
-    const cwd = await createWorkspace();
+  test("prunes completed plans and deletes plan file", async () => {
+    const cwd = await createWorkspace({ changelog: false });
     tempDirs.push(cwd);
+
+    exec.mockResolvedValue({
+      exitCode: 0,
+      stdout: '"1.0.0"\n',
+      stderr: "",
+    } as Awaited<ReturnType<typeof x>>);
 
     await writeJson(join(cwd, ".tegami/publish-plan.json"), {
       id: "tegami-existing",
@@ -218,16 +224,59 @@ describe("draft publish plans", () => {
     });
 
     const draft = await tegami({ cwd }).draft();
+
+    await expect(readFile(join(cwd, ".tegami/publish-plan.json"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+
+    expect(draft.getPackage("npm:@acme/core")).toBeUndefined();
+  });
+
+  test("merges unpublished packages into the new draft plan instead of blocking", async () => {
+    const cwd = await createWorkspace({ changelog: false });
+    tempDirs.push(cwd);
+
     exec.mockResolvedValue({
       exitCode: 1,
       stdout: "",
       stderr: "npm ERR! code E404\nnpm ERR! 404 Not Found",
     } as Awaited<ReturnType<typeof x>>);
 
-    await expect(draft.createPublishPlan()).rejects.toThrow(/Publish plan already exists/);
-    expect(await readJson<PackageManifest>(join(cwd, "packages/core/package.json"))).toMatchObject({
-      version: "1.0.0",
+    await writeJson(join(cwd, ".tegami/publish-plan.json"), {
+      id: "tegami-existing",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      changelogs: {
+        "existing-change": {
+          filename: "change.md",
+          packages: ["@acme/core"],
+          type: "patch",
+          title: "Stale fix",
+          content: "Old description.",
+        },
+      },
+      packages: {
+        "npm:@acme/core": {
+          type: "patch",
+          changelogIds: ["existing-change"],
+          fromVersion: "1.0.0",
+          distTag: "latest",
+          publish: true,
+        },
+      },
     });
+
+    const draft = await tegami({ cwd }).draft();
+
+    expect(draft.getPackage("npm:@acme/core")).toEqual(
+      expect.objectContaining({
+        type: "patch",
+        fromVersion: "1.0.0",
+        publish: true,
+      }),
+    );
+    expect(draft.getChangelog("existing-change")).toBeDefined();
+
+    await expect(draft.createPublishPlan()).resolves.toBeUndefined();
   });
 
   test("discovers packages with nested workspace globs", async () => {

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { createChangelog } from "./changelog/create";
 import type { CreateChangelogOptions, CreatedChangelog } from "./changelog/create";
 import { createTegamiContext, TegamiContext } from "./context";
@@ -64,6 +64,8 @@ export function tegami(options: TegamiOptions = {}): Tegami {
       const changelogs = await readChangelogEntries(context.cwd, context.changelogDir);
       let plan = createDraftPlan(changelogs, context);
 
+      await pruneAndMergeExistingPlan(plan, context);
+
       for (const plugin of context.plugins) {
         plan = (await plugin.initPlan?.call(context, plan)) ?? plan;
       }
@@ -99,4 +101,66 @@ export function tegami(options: TegamiOptions = {}): Tegami {
       return result;
     },
   };
+}
+
+async function pruneAndMergeExistingPlan(plan: DraftPlan, context: TegamiContext): Promise<void> {
+  const existingPlan = await readFile(context.planPath, "utf8")
+    .then((content) => planStoreSchema.decode(content))
+    .catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") return undefined;
+      throw error;
+    });
+
+  if (!existingPlan) return;
+
+  let anyUnpublished = false;
+  for (const [id, pkgPlan] of Object.entries(existingPlan.packages)) {
+    const pkg = context.graph.get(id);
+    if (!pkg) continue;
+
+    const exists = await context.getRegistryClient(pkg).packageVersionExists(pkg, pkg.version);
+    if (!exists) {
+      anyUnpublished = true;
+      const existingDraftPkg = plan.getPackage(id);
+      if (existingDraftPkg) {
+        plan.setPackage(id, {
+          type: existingDraftPkg.type,
+          fromVersion: existingDraftPkg.fromVersion,
+          changelogIds: new Set([...existingDraftPkg.changelogIds, ...pkgPlan.changelogIds]),
+          distTag: existingDraftPkg.distTag ?? pkgPlan.distTag,
+          publish: existingDraftPkg.publish || pkgPlan.publish,
+        });
+      } else {
+        plan.setPackage(id, {
+          type: pkgPlan.type,
+          fromVersion: pkgPlan.fromVersion,
+          changelogIds: new Set(pkgPlan.changelogIds),
+          distTag: pkgPlan.distTag,
+          publish: pkgPlan.publish,
+        });
+      }
+
+      // Merge corresponding changelogs
+      for (const changelogId of pkgPlan.changelogIds) {
+        const changelog = existingPlan.changelogs[changelogId];
+        if (changelog) {
+          plan.setChangelog(changelogId, {
+            id: changelogId,
+            filename: changelog.filename,
+            subject: changelog.subject,
+            packages: new Set(changelog.packages),
+            type: changelog.type,
+            title: changelog.title,
+            content: changelog.content,
+          });
+        }
+      }
+    }
+  }
+
+  if (!anyUnpublished) {
+    await rm(context.planPath, { force: true });
+  } else {
+    plan.markMergedExisting();
+  }
 }
