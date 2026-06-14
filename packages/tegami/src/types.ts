@@ -1,8 +1,10 @@
+import { SemVer } from "semver";
 import type { TegamiContext } from "./context";
-import type { DraftPlan, PackageOptions } from "./draft";
+import type { DependencySpec, DraftPlan, PackageOptions } from "./draft";
 import type { ChangelogEntry } from "./markdown";
 import type { PublishOptions, PublishResult } from "./publish";
 import type { NpmClient } from "./registry/npm";
+import type { WorkspacePackage } from "./workspace";
 
 /** Generates changelog content for a package release. */
 export interface LogGenerator {
@@ -47,6 +49,19 @@ export interface TegamiPlugin {
     this: TegamiContext & { publishOptions: PublishOptions },
     result: PublishResult,
   ): Awaitable<PublishResult | void | undefined>;
+
+  /**
+   * @param pkg - the package that referenced the dependency
+   * @param spec - the referenced dependency & its range
+   * @param target - the target version to update to
+   * @returns fallback to the default behaviour if `undefined`, otherwise replace with updated spec (can reuse the same instance, as long as a value is returned).
+   */
+  onUpdateRange?(
+    this: TegamiContext,
+    pkg: WorkspacePackage,
+    spec: DependencySpec,
+    target: SemVer,
+  ): Awaitable<DependencySpec | void | undefined>;
 }
 
 export type Awaitable<T> = T | Promise<T>;

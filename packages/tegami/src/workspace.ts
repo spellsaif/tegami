@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { load } from "js-yaml";
 import { glob } from "tinyglobby";
@@ -14,12 +14,16 @@ export interface WorkspacePackage {
 
 /** Dependency graph for discovered workspace packages. */
 export class PackageGraph {
-  readonly packages: WorkspacePackage[];
-  readonly byName: Map<string, WorkspacePackage>;
+  private readonly packages: WorkspacePackage[];
+  private readonly byName: Map<string, WorkspacePackage>;
 
   constructor(packages: WorkspacePackage[]) {
     this.packages = packages;
     this.byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
+  }
+
+  getPackages() {
+    return this.packages;
   }
 
   /** Get a package by exact name. */

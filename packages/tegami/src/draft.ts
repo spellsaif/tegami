@@ -2,10 +2,11 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path, { dirname, join } from "node:path";
 import type { TegamiContext } from "./context";
 import { simpleGenerator } from "./generators/simple";
-import { BumpType, bumpVersion, maxBump, updateRange } from "./utils/semver";
+import { BumpType, bumpVersion, maxBump } from "./utils/semver";
 import type { WorkspacePackage } from "./workspace";
 import type { ChangelogEntry } from "./markdown";
 import { PlanStore, planStoreSchema } from "./schemas";
+import * as semver from "semver";
 
 /** Per-package options applied when creating publish plans. */
 export interface PackageOptions {
@@ -22,7 +23,7 @@ export interface PackagePlan {
   publish: boolean;
 }
 
-const dependencyFields = [
+const DEP_FIELDS = [
   "dependencies",
   "devDependencies",
   "peerDependencies",
@@ -126,38 +127,65 @@ export class DraftPlan {
 
   private async applyVersionChanges(): Promise<void> {
     const { graph } = this.context;
+    const updatedPackages = new Map<string, { plan: PackagePlan; version: string }>();
     const writes: Promise<void>[] = [];
-    // TODO: Add dependent package bumps when an internal dependency changes outside a
-    // dependent's accepted semver range.
+
     for (const [name, plan] of this.packages) {
       const pkg = graph.get(name);
       if (!pkg) continue;
 
-      const manifest = pkg.manifest;
-      manifest.version = bumpVersion(manifest.version ?? "0.0.0", plan.type);
+      updatedPackages.set(name, {
+        plan,
+        version: bumpVersion(pkg.manifest.version ?? "0.0.0", plan.type),
+      });
     }
 
-    for (const [name, plan] of this.packages) {
-      const pkg = graph.get(name);
-      if (!pkg) continue;
+    const updateRange = async (
+      pkg: WorkspacePackage,
+      spec: DependencySpec,
+      next: semver.SemVer,
+    ): Promise<DependencySpec> => {
+      for (const plugin of this.context.plugins) {
+        const result = await plugin.onUpdateRange?.call(this.context, pkg, spec, next);
+        if (result) return result;
+      }
 
-      for (const field of dependencyFields) {
+      // ignore special syntax like "latest"
+      if (!semver.validRange(spec.range)) return spec;
+      const range = new semver.Range(spec.range);
+      // in range = keep
+      if (range.test(next)) return spec;
+
+      spec.range = next.format();
+      return spec;
+    };
+
+    for (const pkg of graph.getPackages()) {
+      const updated = updatedPackages.get(pkg.name);
+
+      for (const field of DEP_FIELDS) {
         const dependencies = pkg.manifest[field];
         if (!dependencies) continue;
 
-        for (const [name, range] of Object.entries(dependencies)) {
-          const dep = graph.get(name);
-          if (!dep?.manifest.version) continue;
+        for (const [rawName, rawRange] of Object.entries(dependencies)) {
+          const spec = DependencySpec.parse(rawName, rawRange);
+          if (!spec) continue;
+          const updatedDep = updatedPackages.get(spec.name);
+          if (!updatedDep) continue;
+          const version = semver.parse(updatedDep.version);
+          if (!version) continue;
 
-          dependencies[name] = updateRange(range, dep.manifest.version);
+          dependencies[rawName] = (await updateRange(pkg, spec, version)).format();
         }
       }
 
+      if (updated) {
+        pkg.manifest.version = updated.version;
+        writes.push(this.appendChangelog(pkg, updated.plan));
+      }
+
       const packageJsonPath = join(pkg.path, "package.json");
-      writes.push(
-        writeFile(packageJsonPath, `${JSON.stringify(pkg.manifest, null, 2)}\n`),
-        this.appendChangelog(pkg, plan),
-      );
+      writes.push(writeFile(packageJsonPath, `${JSON.stringify(pkg.manifest, null, 2)}\n`));
     }
 
     await Promise.all(writes);
@@ -201,6 +229,42 @@ export class DraftPlan {
   /** {@link createPublishPlan} but for `await using` syntax */
   async [Symbol.asyncDispose]() {
     return this.createPublishPlan();
+  }
+}
+
+export class DependencySpec {
+  constructor(
+    public name: string,
+    public range: string,
+    public protocol?: "npm" | "workspace",
+  ) {}
+
+  format(): string {
+    if (this.protocol === "workspace") {
+      return `workspace:${this.range}`;
+    }
+
+    if (this.protocol === "npm") {
+      return `npm:${this.name}@${this.range}`;
+    }
+
+    return this.range;
+  }
+
+  static parse(rawName: string, rawRange: string): DependencySpec | undefined {
+    if (rawRange.startsWith("workspace:")) {
+      return new DependencySpec(rawName, rawRange.slice("workspace:".length), "workspace");
+    }
+
+    if (rawRange.startsWith("npm:")) {
+      const spec = rawRange.slice("npm:".length);
+      const separator = spec.lastIndexOf("@");
+      if (separator <= 0) return undefined;
+
+      return new DependencySpec(spec.slice(0, separator), spec.slice(separator + 1), "npm");
+    }
+
+    return new DependencySpec(rawName, rawRange);
   }
 }
 

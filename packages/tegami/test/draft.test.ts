@@ -82,9 +82,19 @@ describe("draft publish plans", () => {
         },
         "ui": {
           "dependencies": {
-            "@acme/core": "^1.1.0",
+            "@acme/core": "^1.0.0",
+            "@acme/core-alias": "npm:@acme/core@1.1.0",
+          },
+          "devDependencies": {
+            "@acme/core": "workspace:^1.0.0",
           },
           "name": "@acme/ui",
+          "optionalDependencies": {
+            "@acme/core": "1.1.0",
+          },
+          "peerDependencies": {
+            "@acme/core": "workspace:*",
+          },
           "version": "1.1.0",
         },
       }
@@ -263,6 +273,16 @@ async function createWorkspace(options: { changelog?: boolean } = {}): Promise<s
     version: "1.0.0",
     dependencies: {
       "@acme/core": "^1.0.0",
+      "@acme/core-alias": "npm:@acme/core@~1.0.0",
+    },
+    devDependencies: {
+      "@acme/core": "workspace:^1.0.0",
+    },
+    peerDependencies: {
+      "@acme/core": "workspace:*",
+    },
+    optionalDependencies: {
+      "@acme/core": "~1.0.0",
     },
   });
   if (options.changelog !== false) {
