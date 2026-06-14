@@ -3,6 +3,7 @@ import type { TegamiContext } from "../context";
 import type { DraftPlan } from "../draft";
 import type { PackagePublishResult } from "../publish";
 import type { Awaitable, TegamiPlugin } from "../types";
+import { execFailure } from "../utils/exec";
 import { git, type GitPluginOptions } from "./git";
 import { isCI } from "../utils/constants";
 
@@ -69,9 +70,12 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
       args.push("--prerelease");
     }
 
-    await x("gh", args, {
-      throwOnError: true,
-    });
+    const result = await x("gh", args);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        execFailure(`Failed to create GitHub release for ${pkg.name}@${pkg.version}.`, result),
+      );
+    }
   }
 
   function resolvePROptions(): [false] | [true, VersionPullRequestOptions] {
@@ -101,19 +105,35 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
             body = defaultVersionPRBody(draft, this),
           } = config;
 
-          async function runGit(...args: string[]): Promise<void> {
-            await x("git", args, {
-              nodeOptions: {
-                cwd,
-              },
-              throwOnError: true,
-            });
+          const gitOptions = { nodeOptions: { cwd } };
+
+          let result = await x("git", ["checkout", "-B", branch], gitOptions);
+          if (result.exitCode !== 0) {
+            throw new Error(
+              execFailure("Failed to create the version pull request branch.", result),
+            );
           }
 
-          await runGit("checkout", "-B", branch);
-          await runGit("add", "-A");
-          await runGit("commit", "-m", title);
-          await runGit("push", "--force", "-u", "origin", branch);
+          result = await x("git", ["add", "-A"], gitOptions);
+          if (result.exitCode !== 0) {
+            throw new Error(execFailure("Failed to stage version changes.", result));
+          }
+
+          result = await x("git", ["commit", "-m", title], gitOptions);
+          if (result.exitCode !== 0) {
+            throw new Error(execFailure("Failed to commit version changes.", result));
+          }
+
+          const pushArgs = ["push", "--force", "-u", "origin", branch];
+          result = await x("git", pushArgs, gitOptions);
+          if (result.exitCode !== 0) {
+            throw new Error(
+              execFailure(
+                "Failed to push the version branch to origin. Ensure `origin` is configured and you have push access.",
+                result,
+              ),
+            );
+          }
 
           if (await hasOpenPullRequest(branch, options.repo)) return;
 
@@ -131,7 +151,10 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
           ];
           if (options.repo) args.push("--repo", options.repo);
 
-          await x("gh", args, { throwOnError: true });
+          const prResult = await x("gh", args);
+          if (prResult.exitCode !== 0) {
+            throw new Error(execFailure("Failed to create the version pull request.", prResult));
+          }
         },
       },
       async afterPublish(result) {
@@ -157,9 +180,10 @@ async function hasOpenPullRequest(branch: string, repo: string | undefined): Pro
   const args = ["pr", "list", "--head", branch, "--state", "open", "--json", "number"];
   if (repo) args.push("--repo", repo);
 
-  const result = await x("gh", args, {
-    throwOnError: true,
-  });
+  const result = await x("gh", args);
+  if (result.exitCode !== 0) {
+    throw new Error(execFailure("Failed to check for an existing version pull request.", result));
+  }
 
   return result.stdout.trim() !== "[]";
 }

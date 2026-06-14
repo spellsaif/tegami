@@ -14,6 +14,7 @@ const exec = vi.mocked(x);
 
 beforeEach(() => {
   exec.mockReset();
+  exec.mockImplementation(() => commandResult());
 });
 
 describe("github release plugin", () => {
@@ -63,7 +64,9 @@ describe("github release plugin", () => {
             "--prerelease",
           ],
           {
-            "throwOnError": true,
+            "nodeOptions": {
+              "cwd": undefined,
+            },
           },
         ],
       ]
@@ -129,7 +132,9 @@ describe("github release plugin", () => {
       Some description.",
           ],
           {
-            "throwOnError": true,
+            "nodeOptions": {
+              "cwd": undefined,
+            },
           },
         ],
       ]
@@ -186,7 +191,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -195,7 +200,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -205,7 +210,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -217,7 +222,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -234,7 +239,7 @@ describe("github version pull request", () => {
             ],
             "command": "gh",
             "cwd": undefined,
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
         ]
       `);
@@ -292,7 +297,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -301,7 +306,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -311,7 +316,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -323,7 +328,7 @@ describe("github version pull request", () => {
             ],
             "command": "git",
             "cwd": "/repo",
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -340,7 +345,7 @@ describe("github version pull request", () => {
             ],
             "command": "gh",
             "cwd": undefined,
-            "throwOnError": true,
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -364,8 +369,8 @@ describe("github version pull request", () => {
               "acme/repo",
             ],
             "command": "gh",
-            "cwd": undefined,
-            "throwOnError": true,
+            "cwd": "/repo",
+            "throwOnError": undefined,
           },
         ]
       `);

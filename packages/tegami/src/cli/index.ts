@@ -203,7 +203,14 @@ async function versionPackages(
 
   const context = await tegami._internal.context();
   for (const plugin of context.plugins) {
-    await plugin.cli?.afterVersion?.call(context, draft);
+    try {
+      await plugin.cli?.afterVersion?.call(context, draft);
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      throw new Error(`Plugin "${plugin.name}" failed during afterVersion:\n${details}`, {
+        cause: error,
+      });
+    }
   }
 
   outro("Publish plan created.");
