@@ -43,14 +43,14 @@ export function createCli(tegami: Tegami, options: TegamiCLIOptions = {}) {
     .name("tegami")
     .description("Create changelogs, version packages, and publish releases.")
     .action((commandOptions: ChangelogCommandOptions) =>
-      runAction(() => createChangelogs(tegami, { ...commandOptions, cli: options })),
+      runAction(tegami, () => createChangelogs(tegami, { ...commandOptions, cli: options })),
     );
 
   program
     .command("version")
     .description("create a publish plan and update package versions")
     .action((commandOptions: VersionCommandOptions) =>
-      runAction(() => versionPackages(tegami, { ...commandOptions, cli: options })),
+      runAction(tegami, () => versionPackages(tegami, { ...commandOptions, cli: options })),
     );
 
   program
@@ -58,7 +58,7 @@ export function createCli(tegami: Tegami, options: TegamiCLIOptions = {}) {
     .description("publish packages from the current publish plan")
     .option("--dry-run", "validate the publish plan without publishing packages")
     .action((commandOptions: PublishCommandOptions) =>
-      runAction(() => publishPackages(tegami, { ...commandOptions, cli: options })),
+      runAction(tegami, () => publishPackages(tegami, { ...commandOptions, cli: options })),
     );
 
   return program;
@@ -280,8 +280,24 @@ function changelogFilename(): string {
   return `${yyyy}-${mm}-${dd}-${hash}.md`;
 }
 
-async function runAction(action: () => Awaitable<void>): Promise<void> {
+async function initPlugins(tegami: Tegami): Promise<void> {
+  const context = await tegami._internal.context();
+
+  for (const plugin of context.plugins) {
+    try {
+      await plugin.cli?.init?.call(context);
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      throw new Error(`Plugin "${plugin.name}" failed during cli.init:\n${details}`, {
+        cause: error,
+      });
+    }
+  }
+}
+
+async function runAction(tegami: Tegami, action: () => Awaitable<void>): Promise<void> {
   try {
+    await initPlugins(tegami);
     await action();
   } catch (error) {
     process.exitCode = 1;

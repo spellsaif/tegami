@@ -59,6 +59,8 @@ export interface TegamiPlugin {
 
   /** CLI lifecycle hooks. */
   cli?: {
+    /** Called once before a CLI command runs. */
+    init?(this: TegamiContext): Awaitable<void>;
     /** Called after `tegami version` creates a publish plan. */
     afterVersion?(this: TegamiContext, draft: DraftPlan): Awaitable<void>;
   };

@@ -28,6 +28,38 @@ afterEach(async () => {
 });
 
 describe("git utils", () => {
+  test("configures git user during cli.init in CI", async () => {
+    const previousCi = process.env.CI;
+    process.env.CI = "true";
+
+    try {
+      const plugin = git();
+      exec.mockImplementation(() => commandResult() as ReturnType<typeof x>);
+
+      await plugin.cli?.init?.call(pluginContext());
+
+      expect(exec.mock.calls.map(([command, args, options]) => ({
+        command,
+        args,
+        cwd: options?.nodeOptions?.cwd,
+      }))).toEqual([
+        {
+          command: "git",
+          args: ["config", "user.name", "github-actions[bot]"],
+          cwd: "/repo",
+        },
+        {
+          command: "git",
+          args: ["config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
+          cwd: "/repo",
+        },
+      ]);
+    } finally {
+      if (previousCi === undefined) delete process.env.CI;
+      else process.env.CI = previousCi;
+    }
+  });
+
   test("skips tags that already exist", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "tegami-git-"));
     tempDirs.push(cwd);

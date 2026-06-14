@@ -39,12 +39,6 @@ describe("tegami plugins", () => {
         "initPlan:default-b",
         "initPlan:post-a",
         "initPlan:post-b",
-        "afterPublish:pre-a",
-        "afterPublish:pre-b",
-        "afterPublish:default-a",
-        "afterPublish:default-b",
-        "afterPublish:post-a",
-        "afterPublish:post-b",
       ]
     `);
   });

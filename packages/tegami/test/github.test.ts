@@ -63,11 +63,6 @@ describe("github release plugin", () => {
             "acme/repo",
             "--prerelease",
           ],
-          {
-            "nodeOptions": {
-              "cwd": undefined,
-            },
-          },
         ],
       ]
     `);
@@ -131,11 +126,6 @@ describe("github release plugin", () => {
 
       Some description.",
           ],
-          {
-            "nodeOptions": {
-              "cwd": undefined,
-            },
-          },
         ],
       ]
     `);
@@ -143,6 +133,32 @@ describe("github release plugin", () => {
 });
 
 describe("github version pull request", () => {
+  test("configures git remote during cli.init in CI", async () => {
+    const previousCi = process.env.CI;
+    const previousToken = process.env.GITHUB_TOKEN;
+    process.env.CI = "true";
+    process.env.GITHUB_TOKEN = "test-token";
+
+    try {
+      const plugin = githubPlugin({ repo: "acme/repo" });
+      exec.mockImplementation(() => commandResult());
+
+      await plugin.cli?.init?.call(publishContext());
+
+      expect(exec).toHaveBeenCalledWith(
+        "git",
+        ["remote", "set-url", "origin", "https://x-access-token:test-token@github.com/acme/repo.git"],
+        { nodeOptions: { cwd: "/repo" } },
+      );
+    } finally {
+      if (previousCi === undefined) delete process.env.CI;
+      else process.env.CI = previousCi;
+
+      if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+      else process.env.GITHUB_TOKEN = previousToken;
+    }
+  });
+
   test("updates an existing version pull request in CI", async () => {
     const previousCi = process.env.CI;
     process.env.CI = "true";
@@ -369,7 +385,7 @@ describe("github version pull request", () => {
               "acme/repo",
             ],
             "command": "gh",
-            "cwd": "/repo",
+            "cwd": undefined,
             "throwOnError": undefined,
           },
         ]

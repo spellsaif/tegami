@@ -93,6 +93,29 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
     {
       name: "github",
       cli: {
+        async init() {
+          if (!isCI()) return;
+
+          const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+          const repository = options.repo ?? process.env.GITHUB_REPOSITORY;
+          if (!token || !repository) return;
+
+          const result = await x(
+            "git",
+            [
+              "remote",
+              "set-url",
+              "origin",
+              `https://x-access-token:${token}@github.com/${repository}.git`,
+            ],
+            { nodeOptions: { cwd: this.cwd } },
+          );
+          if (result.exitCode !== 0) {
+            throw new Error(
+              execFailure("Failed to configure git remote for GitHub Actions.", result),
+            );
+          }
+        },
         async afterVersion(draft) {
           const { cwd } = this;
           const [enabled, config] = resolvePROptions();

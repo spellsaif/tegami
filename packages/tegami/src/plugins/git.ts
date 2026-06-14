@@ -1,5 +1,6 @@
 import { x } from "tinyexec";
 import type { TegamiPlugin } from "../types";
+import { execFailure } from "../utils/exec";
 import { isCI } from "../utils/constants";
 
 export interface GitPluginOptions {
@@ -21,6 +22,25 @@ export function git(options: GitPluginOptions = {}): TegamiPlugin {
   return {
     name: "git",
     enforce: "pre",
+    cli: {
+      async init() {
+        if (!isCI()) return;
+
+        const gitOptions = { nodeOptions: { cwd: this.cwd } };
+
+        for (const args of [
+          ["config", "user.name", "github-actions[bot]"],
+          ["config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
+        ] as const) {
+          const result = await x("git", [...args], gitOptions);
+          if (result.exitCode !== 0) {
+            throw new Error(
+              execFailure("Failed to configure git user for GitHub Actions.", result),
+            );
+          }
+        }
+      },
+    },
     async afterPublish(result) {
       const {
         cwd,
