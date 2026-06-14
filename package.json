@@ -9,20 +9,22 @@
     "format": "oxfmt",
     "test": "vitest",
     "types:check": "turbo run types:check",
-    "tegami": "pnpm --filter tegami build && node scripts/tegami.mjs",
-    "changelog": "pnpm --filter tegami build && node scripts/tegami.mjs",
-    "version": "pnpm --filter tegami build && node scripts/tegami.mjs version",
-    "release": "pnpm --filter tegami build && node scripts/tegami.mjs publish"
+    "tegami": "pnpm --filter tegami build && node scripts/tegami.mts",
+    "changelog": "pnpm --filter tegami build && node scripts/tegami.mts",
+    "version": "pnpm --filter tegami build && node scripts/tegami.mts version",
+    "release": "pnpm --filter tegami build && node scripts/tegami.mts publish"
   },
   "devDependencies": {
+    "@types/node": "^25.9.3",
     "oxfmt": "^0.54.0",
     "oxlint": "^1.69.0",
+    "tegami": "workspace:*",
     "turbo": "^2.9.18",
     "typescript": "6.0.3",
     "vitest": "^4.1.8"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "packageManager": "pnpm@11.6.0"
 }
