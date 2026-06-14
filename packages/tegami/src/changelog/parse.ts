@@ -1,8 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import type { Heading, Root, RootContent } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
 import { toMarkdown } from "mdast-util-to-markdown";
-import { remark } from "remark";
 import { changelogFrontmatterSchema } from "../schemas";
 import { isNodeError } from "../utils/error";
 import type { BumpType } from "../utils/semver";
@@ -48,7 +48,7 @@ export async function readChangelogEntries(
 export function parseChangelogFile(file: string, content: string): ChangelogEntry[] {
   const parsed = frontmatter(content);
   const data = changelogFrontmatterSchema.parse(parsed.data);
-  const tree = remark().parse(parsed.content);
+  const tree = fromMarkdown(parsed.content);
   const entries: ChangelogEntry[] = [];
 
   for (const section of getHeadingSections(tree)) {

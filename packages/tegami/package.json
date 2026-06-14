@@ -1,5 +1,5 @@
 {
-  "name": "@tegami/core",
+  "name": "tegami",
   "version": "0.0.0",
   "description": "Utility for package versioning & publish",
   "license": "MIT",
@@ -28,9 +28,9 @@
   },
   "dependencies": {
     "js-yaml": "^4.2.0",
+    "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-to-markdown": "^2.1.2",
     "package-manager-detector": "^1.6.0",
-    "remark": "^15.0.1",
     "semver": "^7.8.4",
     "smol-toml": "^1.6.1",
     "tinyexec": "^1.2.4",
