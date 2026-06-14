@@ -1,7 +1,7 @@
 import { x } from "tinyexec";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { PlanStore } from "../src/schemas";
-import { NpmRegistryClient } from "../src/utils/registry";
+import { NpmRegistryClient } from "../src/registry/npm";
 import { PackageGraph, type WorkspacePackage } from "../src/workspace";
 
 vi.mock("tinyexec", () => ({

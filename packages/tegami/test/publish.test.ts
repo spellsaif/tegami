@@ -67,7 +67,6 @@ describe("publish plans", () => {
       }),
       {
         dryRun: false,
-        gitTags: false,
       },
     );
 
@@ -155,138 +154,7 @@ describe("publish plans", () => {
     `);
   });
 
-  test("creates git tags after all packages publish successfully", async () => {
-    const { cwd, corePath, uiPath, planPath } = await createMultiPackagePublishFixture();
-
-    exec.mockImplementation((_command, args = []) => {
-      if (args.at(0) === "view") {
-        return commandResult({
-          exitCode: 1,
-          stderr: "npm ERR! code E404\nnpm ERR! 404 Not Found",
-        });
-      }
-
-      if (args.at(0) === "rev-parse") {
-        return commandResult({
-          exitCode: 1,
-        });
-      }
-
-      if (args.at(0) === "publish" || args.at(0) === "tag") {
-        return commandResult();
-      }
-
-      throw new Error(`Unexpected command: ${args.join(" ")}`);
-    });
-
-    const result = await publishFixture(
-      planPath,
-      await createTegamiContext({
-        cwd,
-        planPath,
-        npmClient: "npm",
-      }),
-    );
-
-    expect(result.state).toBe("success");
-    expect(result.packages.every((pkg) => pkg.state === "success")).toBe(true);
-    expect(
-      exec.mock.calls.map((call) =>
-        normalizeExecCall(call, {
-          cwd,
-          corePath,
-          uiPath,
-        }),
-      ),
-    ).toMatchInlineSnapshot(`
-      [
-        {
-          "args": [
-            "view",
-            "@acme/core@1.0.1",
-            "version",
-            "--json",
-          ],
-          "command": "npm",
-          "cwd": "<workspace>",
-          "throwOnError": undefined,
-        },
-        {
-          "args": [
-            "publish",
-            "--tag",
-            "latest",
-          ],
-          "command": "npm",
-          "cwd": "<core>",
-          "throwOnError": true,
-        },
-        {
-          "args": [
-            "view",
-            "@acme/ui@1.0.1",
-            "version",
-            "--json",
-          ],
-          "command": "npm",
-          "cwd": "<workspace>",
-          "throwOnError": undefined,
-        },
-        {
-          "args": [
-            "publish",
-            "--tag",
-            "latest",
-          ],
-          "command": "npm",
-          "cwd": "<ui>",
-          "throwOnError": true,
-        },
-        {
-          "args": [
-            "rev-parse",
-            "-q",
-            "--verify",
-            "refs/tags/@acme/core@1.0.1",
-          ],
-          "command": "git",
-          "cwd": "<core>",
-          "throwOnError": undefined,
-        },
-        {
-          "args": [
-            "tag",
-            "@acme/core@1.0.1",
-          ],
-          "command": "git",
-          "cwd": "<core>",
-          "throwOnError": true,
-        },
-        {
-          "args": [
-            "rev-parse",
-            "-q",
-            "--verify",
-            "refs/tags/@acme/ui@1.0.1",
-          ],
-          "command": "git",
-          "cwd": "<ui>",
-          "throwOnError": undefined,
-        },
-        {
-          "args": [
-            "tag",
-            "@acme/ui@1.0.1",
-          ],
-          "command": "git",
-          "cwd": "<ui>",
-          "throwOnError": true,
-        },
-      ]
-    `);
-  });
-
-  test("does not create git tags when any package publish fails", async () => {
+  test("does not run plugin work when any package publish fails", async () => {
     const { cwd, planPath } = await createMultiPackagePublishFixture();
 
     exec.mockImplementation((_command, args = [], options = {}) => {
@@ -326,7 +194,7 @@ describe("publish plans", () => {
         error: "publish failed",
       }),
     );
-    expect(exec.mock.calls.some(([, args]) => args?.at(0) === "tag")).toBe(false);
+    expect(exec.mock.calls.every(([, args]) => args?.at(0) !== "tag")).toBe(true);
   });
 
   test("publishes versions that are missing from the registry", async () => {
@@ -356,7 +224,6 @@ describe("publish plans", () => {
       }),
       {
         dryRun: false,
-        gitTags: false,
       },
     );
 
@@ -535,37 +402,4 @@ function normalizeChangelog(
     ...changelog,
     packages: Array.from(changelog.packages),
   };
-}
-
-function normalizeExecCall(
-  [command, args, options]: Parameters<typeof x>,
-  paths: {
-    cwd: string;
-    corePath: string;
-    uiPath: string;
-  },
-) {
-  return {
-    command,
-    args,
-    cwd: normalizeCwd(
-      typeof options?.nodeOptions?.cwd === "string" ? options.nodeOptions.cwd : undefined,
-      paths,
-    ),
-    throwOnError: options?.throwOnError,
-  };
-}
-
-function normalizeCwd(
-  cwd: string | undefined,
-  paths: {
-    cwd: string;
-    corePath: string;
-    uiPath: string;
-  },
-) {
-  if (cwd === paths.cwd) return "<workspace>";
-  if (cwd === paths.corePath) return "<core>";
-  if (cwd === paths.uiPath) return "<ui>";
-  return cwd;
 }

@@ -2,6 +2,7 @@ import { detect } from "package-manager-detector";
 import { x } from "tinyexec";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createTegamiContext } from "../src/context";
+import type { TegamiPlugin } from "../src/types";
 
 vi.mock("package-manager-detector", () => ({
   detect: vi.fn(),
@@ -81,4 +82,39 @@ describe("tegami context", () => {
       },
     });
   });
+
+  test("stores plugins in enforce order", async () => {
+    const plugins = [
+      plugin("default-a"),
+      plugin("post-a", "post"),
+      plugin("pre-a", "pre"),
+      plugin("default-b", "default"),
+      plugin("pre-b", "pre"),
+      plugin("post-b", "post"),
+    ];
+
+    const context = await createTegamiContext({
+      cwd: "/repo",
+      npmClient: "npm",
+      plugins,
+    });
+
+    expect(context.plugins.map((plugin) => plugin.name)).toMatchInlineSnapshot(`
+      [
+        "pre-a",
+        "pre-b",
+        "default-a",
+        "default-b",
+        "post-a",
+        "post-b",
+      ]
+    `);
+  });
 });
+
+function plugin(name: string, enforce?: TegamiPlugin["enforce"]): TegamiPlugin {
+  return {
+    name,
+    enforce,
+  };
+}

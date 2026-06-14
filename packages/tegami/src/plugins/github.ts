@@ -1,41 +1,48 @@
 import { x } from "tinyexec";
 import type { PackagePublishResult } from "../publish";
-import type { TegamiPlugin } from "../types";
+import type { Awaitable, TegamiPlugin } from "../types";
+import { git, type GitPluginOptions } from "./git";
 
-type GithubReleaseValue<T> = T | ((pkg: PackagePublishResult) => T);
+interface GithubRelease {
+  /** Release title */
+  title?: string;
+  /** Release notes */
+  notes?: string;
+  /** Whether to mark release as prerelease */
+  prerelease?: boolean;
+}
 
 /** Options for creating GitHub releases after a successful publish. */
-export interface GithubReleaseOptions {
-  /** GitHub repository passed to `gh release create --repo`. */
+export interface GitHubPluginOptions extends GitPluginOptions {
+  /** GitHub repository. */
   repo?: string;
-  /** Release title, or a function that derives one from the published package. */
-  title?: GithubReleaseValue<string>;
-  /** Release notes, or a function that derives them from the published package. */
-  notes?: GithubReleaseValue<string>;
-  /** Whether to mark releases as prereleases. */
-  prerelease?: GithubReleaseValue<boolean>;
+
+  /** override release details, return `false` to skip */
+  onCreateRelease?: (result: PackagePublishResult) => Awaitable<GithubRelease | false>;
 }
 
 /** Create GitHub releases for successfully published packages after the whole plan succeeds. */
-export function githubRelease(options: GithubReleaseOptions = {}): TegamiPlugin {
+export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
   async function createGithubRelease(pkg: PackagePublishResult): Promise<void> {
     if (!pkg.gitTag) return;
+    const release = (await options.onCreateRelease?.(pkg)) ?? {};
+    if (release === false) return;
 
     const args: string[] = [
       "release",
       "create",
       pkg.gitTag,
       "--title",
-      resolveOption(options.title, pkg) ?? `${pkg.name}@${pkg.version}`,
+      release.title ?? `${pkg.name}@${pkg.version}`,
       "--notes",
-      resolveOption(options.notes, pkg) ?? defaultNotes(pkg),
+      release.notes ?? defaultNotes(pkg),
     ];
 
     if (options.repo) {
       args.push("--repo", options.repo);
     }
 
-    if (resolveOption(options.prerelease, pkg)) {
+    if (release.prerelease) {
       args.push("--prerelease");
     }
 
@@ -44,14 +51,17 @@ export function githubRelease(options: GithubReleaseOptions = {}): TegamiPlugin 
     });
   }
 
-  return {
-    name: "github-release",
-    async afterPublish(result) {
-      if (result.state !== "success") return;
+  return [
+    git(options),
+    {
+      name: "github",
+      async afterPublish(result) {
+        if (result.state !== "success") return;
 
-      await Promise.all(result.packages.map(createGithubRelease));
+        await Promise.all(result.packages.map(createGithubRelease));
+      },
     },
-  };
+  ];
 }
 
 function defaultNotes(pkg: PackagePublishResult): string {
@@ -63,11 +73,4 @@ function defaultNotes(pkg: PackagePublishResult): string {
   }
 
   return [`Published ${pkg.name}@${pkg.version}.`, "", `npm dist-tag: ${pkg.distTag}`].join("\n");
-}
-
-function resolveOption<T>(
-  value: GithubReleaseValue<T> | undefined,
-  pkg: PackagePublishResult,
-): T | undefined {
-  return typeof value === "function" ? (value as (pkg: PackagePublishResult) => T)(pkg) : value;
 }

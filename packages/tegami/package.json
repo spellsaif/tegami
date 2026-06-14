@@ -13,6 +13,8 @@
     ".": "./dist/index.mjs",
     "./generators/simple": "./dist/generators/simple.mjs",
     "./plugins/github": "./dist/plugins/github.mjs",
+    "./registry": "./dist/registry/index.mjs",
+    "./registry/npm": "./dist/registry/npm.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {

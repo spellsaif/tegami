@@ -1,10 +1,10 @@
 // my-repo/tegami.ts
 import { tegami } from "../../src";
-import { githubRelease } from "../../src/plugins/github";
+import { github } from "../../src/plugins/github";
 
 const paper = tegami({
   // create release on GitHub
-  plugins: [githubRelease()],
+  plugins: [github()],
   packages: {
     "my-pkg": {
       distTag: "alpha",

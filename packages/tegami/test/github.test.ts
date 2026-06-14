@@ -1,7 +1,9 @@
 import { x } from "tinyexec";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { PublishResult } from "../src";
-import { githubRelease } from "../src/plugins/github";
+import { github } from "../src/plugins/github";
+import type { TegamiPlugin } from "../src/types";
+import { PackageGraph } from "../src/workspace";
 
 vi.mock("tinyexec", () => ({
   x: vi.fn(),
@@ -15,14 +17,19 @@ beforeEach(() => {
 
 describe("github release plugin", () => {
   test("creates GitHub releases for successful published packages", async () => {
-    const plugin = githubRelease({
+    const plugin = githubPlugin({
       repo: "acme/repo",
-      prerelease: (pkg) => pkg.distTag !== "latest",
-      title: (pkg) => `Release ${pkg.version}`,
-      notes: (pkg) => `Notes for ${pkg.name}`,
+      onCreateRelease(pkg) {
+        return {
+          prerelease: pkg.distTag !== "latest",
+          title: `Release ${pkg.version}`,
+          notes: `Notes for ${pkg.name}`,
+        };
+      },
     });
 
-    await plugin.afterPublish?.(
+    await plugin.afterPublish?.call(
+      publishContext(),
       publishResult({
         packages: [
           packageResult({
@@ -63,9 +70,10 @@ describe("github release plugin", () => {
   });
 
   test("does not create releases when any package failed", async () => {
-    const plugin = githubRelease();
+    const plugin = githubPlugin();
 
-    await plugin.afterPublish?.(
+    await plugin.afterPublish?.call(
+      publishContext(),
       publishResult({
         state: "failed",
         packages: [
@@ -82,9 +90,10 @@ describe("github release plugin", () => {
   });
 
   test("uses changelog entries for default notes", async () => {
-    const plugin = githubRelease();
+    const plugin = githubPlugin();
 
-    await plugin.afterPublish?.(
+    await plugin.afterPublish?.call(
+      publishContext(),
       publishResult({
         packages: [
           packageResult({
@@ -126,6 +135,33 @@ describe("github release plugin", () => {
     `);
   });
 });
+
+function githubPlugin(options?: Parameters<typeof github>[0]): TegamiPlugin {
+  const plugin = github(options).find((plugin) => plugin.name === "github");
+  if (!plugin) throw new Error("GitHub plugin not found.");
+  return plugin;
+}
+
+function publishContext() {
+  return {
+    cwd: "/repo",
+    changelogDir: ".tegami",
+    planPath: "/repo/.tegami/publish-plan.json",
+    options: {},
+    plugins: [],
+    publishOptions: {},
+    graph: new PackageGraph([]),
+    registryClient: {
+      async packageVersionExists() {
+        return false;
+      },
+      async publish() {},
+      async publishPlanStatus() {
+        return { state: "success" as const };
+      },
+    },
+  };
+}
 
 function publishResult(overrides: Partial<PublishResult> = {}): PublishResult {
   return {

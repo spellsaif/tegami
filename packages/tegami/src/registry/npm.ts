@@ -1,18 +1,9 @@
 import { x } from "tinyexec";
 import type { PackageGraph } from "../workspace";
-import type { NpmClient } from "../types";
 import type { PlanStore } from "../schemas";
+import type { PublishPlanStatus, RegistryClient } from ".";
 
-export interface PublishPlanStatus {
-  state: "pending" | "success";
-  error?: string;
-}
-
-export interface RegistryClient {
-  packageVersionExists(name: string, version: string): Promise<boolean>;
-  publish(pkg: { path: string; distTag?: string }): Promise<void>;
-  publishPlanStatus(plan: PlanStore): Promise<PublishPlanStatus>;
-}
+export type NpmClient = "npm" | "pnpm";
 
 export class NpmRegistryClient implements RegistryClient {
   // package@version -> if published

@@ -29,10 +29,10 @@ export function tegami(options: TegamiOptions = {}): Tegami {
     async draft() {
       const context = await createTegamiContext(options);
       const changelogs = await readChangelogEntries(context.cwd, context.changelogDir);
-      const plan = createDraftPlan(changelogs, context);
+      let plan = createDraftPlan(changelogs, context);
 
-      for (const plugin of options.plugins ?? []) {
-        await plugin.initPlan?.(plan);
+      for (const plugin of context.plugins) {
+        plan = (await plugin.initPlan?.call(context, plan)) ?? plan;
       }
 
       return plan;
@@ -42,7 +42,7 @@ export function tegami(options: TegamiOptions = {}): Tegami {
       return (await createTegamiContext(options)).graph;
     },
 
-    async publish(publishOptions) {
+    async publish(publishOptions = {}) {
       const context = await createTegamiContext(options);
       const parsed = await readFile(context.planPath, "utf8")
         .then((content) => planStoreSchema.decode(content))
@@ -55,10 +55,11 @@ export function tegami(options: TegamiOptions = {}): Tegami {
         throw new Error(`No publish plan found at ${context.planPath}.`);
       }
 
-      const result = await publishFromPlan(context, parsed, publishOptions);
+      let result = await publishFromPlan(context, parsed, publishOptions);
 
-      for (const plugin of options.plugins ?? []) {
-        await plugin.afterPublish?.(result);
+      const publishCtx = { ...context, publishOptions };
+      for (const plugin of context.plugins) {
+        result = (await plugin.afterPublish?.call(publishCtx, result)) ?? result;
       }
 
       return result;

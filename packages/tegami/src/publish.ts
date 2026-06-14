@@ -1,13 +1,10 @@
 import type { TegamiContext } from "./context";
-import { createGitTag } from "./utils/git";
 import type { ChangelogEntry } from "./markdown";
 import type { PlanStore } from "./schemas";
 
 export interface PublishOptions {
   /** Validate the publish plan without publishing packages, creating tags, or running release plugins. */
   dryRun?: boolean;
-  /** Set to false to skip creating git tags after all packages publish successfully. */
-  gitTags?: boolean;
 }
 
 export interface PublishResult {
@@ -39,17 +36,15 @@ export type PackagePublishResult = (
 export async function publishFromPlan(
   context: TegamiContext,
   plan: PlanStore,
-  options: PublishOptions = {},
+  options: PublishOptions,
 ): Promise<PublishResult> {
   const packages = await publishStoredPlan(plan, context, options);
-  const result: PublishResult = {
+  return {
     planPath: context.planPath,
     state: packages.some((pkg) => pkg.state === "failed") ? "failed" : "success",
     packages,
     _rawPlan: plan,
   };
-
-  return createGitTags(context, result, options);
 }
 
 async function publishStoredPlan(
@@ -122,39 +117,4 @@ async function publishStoredPlan(
   }
 
   return results;
-}
-
-async function createGitTags(
-  context: TegamiContext,
-  result: PublishResult,
-  { dryRun = false, gitTags = true }: PublishOptions,
-): Promise<PublishResult> {
-  const { graph } = context;
-  if (dryRun || !gitTags || result.state === "failed") return result;
-
-  for (const pkg of result.packages) {
-    try {
-      const gitTag = `${pkg.name}@${pkg.version}`;
-      await createGitTag(graph.get(pkg.name)!.path, gitTag);
-      pkg.gitTag = gitTag;
-    } catch (error) {
-      return {
-        ...result,
-        state: "failed",
-        packages: result.packages.map((pkgResult) => {
-          if (pkgResult.name === pkg.name) {
-            return {
-              ...pkgResult,
-              state: "failed",
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-
-          return pkgResult;
-        }),
-      };
-    }
-  }
-
-  return result;
 }

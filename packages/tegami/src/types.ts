@@ -1,7 +1,8 @@
 import type { TegamiContext } from "./context";
 import type { DraftPlan, PackageOptions } from "./draft";
 import type { ChangelogEntry } from "./markdown";
-import type { PublishResult } from "./publish";
+import type { PublishOptions, PublishResult } from "./publish";
+import type { NpmClient } from "./registry/npm";
 
 /** Generates changelog content for a package release. */
 export interface LogGenerator {
@@ -26,18 +27,26 @@ export interface TegamiOptions {
   generator?: LogGenerator;
   /** Per-package release and publish options keyed by package name. */
   packages?: Record<string, PackageOptions>;
-  plugins?: TegamiPlugin[];
+  plugins?: TegamiPluginOption[];
 
   /** Package manager command used for npm registry operations. */
   npmClient?: NpmClient;
 }
 
+export type TegamiPluginOption = TegamiPlugin | TegamiPluginOption[];
+
 export interface TegamiPlugin {
   name: string;
+  enforce?: "pre" | "default" | "post";
+  /** when Tegami initializes */
+  init?(this: TegamiContext): Awaitable<void>;
   /** Called after Tegami builds the initial draft plan and before it is returned. */
-  initPlan?(plan: DraftPlan): void | Promise<void>;
+  initPlan?(this: TegamiContext, plan: DraftPlan): Awaitable<DraftPlan | void | undefined>;
   /** Called after publishing finishes. */
-  afterPublish?(result: PublishResult): void | Promise<void>;
+  afterPublish?(
+    this: TegamiContext & { publishOptions: PublishOptions },
+    result: PublishResult,
+  ): Awaitable<PublishResult | void | undefined>;
 }
 
-export type NpmClient = "npm" | "pnpm";
+export type Awaitable<T> = T | Promise<T>;
