@@ -4,7 +4,7 @@ import type { DraftPlan } from "../draft";
 import type { PackagePublishResult } from "../publish";
 import type { Awaitable, TegamiPlugin } from "../types";
 import { execFailure } from "../utils/exec";
-import { formatVersionBump, previousVersion } from "../utils/semver";
+import { formatPackageVersion, formatVersionBump, previousVersion } from "../utils/semver";
 import { git, type GitPluginOptions } from "./git";
 import { isCI } from "../utils/constants";
 
@@ -53,12 +53,15 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
     const release = (await options.onCreateRelease?.(pkg)) ?? {};
     if (release === false) return;
 
+    const prerelease =
+      release.prerelease ?? (pkg.distTag !== undefined && pkg.distTag !== "latest");
+
     const args: string[] = [
       "release",
       "create",
       pkg.gitTag,
       "--title",
-      release.title ?? `${pkg.name}@${pkg.version}`,
+      release.title ?? formatPackageVersion(pkg.name, pkg.version, pkg.distTag),
       "--notes",
       release.notes ?? defaultNotes(pkg),
     ];
@@ -67,7 +70,7 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
       args.push("--repo", options.repo);
     }
 
-    if (release.prerelease) {
+    if (prerelease) {
       args.push("--prerelease");
     }
 
@@ -253,5 +256,5 @@ function defaultNotes(pkg: PackagePublishResult): string {
       .join("\n\n");
   }
 
-  return [`Published ${pkg.name}@${pkg.version}.`, "", `npm dist-tag: ${pkg.distTag}`].join("\n");
+  return `Published ${formatPackageVersion(pkg.name, pkg.version, pkg.distTag)}.`;
 }

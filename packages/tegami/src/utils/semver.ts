@@ -2,9 +2,12 @@ import { inc, parse } from "semver";
 
 export type BumpType = "major" | "minor" | "patch";
 
+function formatDistTag(distTag?: string): string {
+  return distTag && distTag !== "latest" ? ` (${distTag})` : "";
+}
+
 export function formatPackageVersion(name: string, version: string, distTag?: string): string {
-  const tag = distTag ? ` (${distTag})` : "";
-  return `${name}@${version}${tag}`;
+  return `${name}@${version}${formatDistTag(distTag)}`;
 }
 
 // TODO: improve draft plan API such that it does not rely on this to obtain the original version before bump
@@ -36,8 +39,7 @@ export function formatVersionBump(
   to: string,
   distTag?: string,
 ): string {
-  const tag = distTag ? ` (${distTag})` : "";
-  return `${name}@${from} → ${name}@${to}${tag}`;
+  return `${name}@${from} → ${name}@${to}${formatDistTag(distTag)}`;
 }
 
 export function maxBump(a: BumpType, b: BumpType): BumpType {

@@ -130,6 +130,30 @@ describe("github release plugin", () => {
       ]
     `);
   });
+
+  test("marks non-latest dist tags as prerelease by default", async () => {
+    const plugin = githubPlugin({ repo: "acme/repo" });
+
+    await plugin.afterPublish?.call(
+      publishContext(),
+      publishResult({
+        packages: [packageResult({ distTag: "beta" })],
+      }),
+    );
+
+    expect(exec.mock.calls[0]?.[1]).toEqual([
+      "release",
+      "create",
+      "@acme/core@1.0.1",
+      "--title",
+      "@acme/core@1.0.1 (beta)",
+      "--notes",
+      "Published @acme/core@1.0.1 (beta).",
+      "--repo",
+      "acme/repo",
+      "--prerelease",
+    ]);
+  });
 });
 
 describe("github version pull request", () => {
