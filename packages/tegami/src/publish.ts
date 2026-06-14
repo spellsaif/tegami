@@ -1,5 +1,5 @@
 import type { TegamiContext } from "./context";
-import type { ChangelogEntry } from "./markdown";
+import type { ChangelogEntry } from "./changelog/parse";
 import type { PlanStore } from "./schemas";
 
 export interface PublishOptions {
@@ -30,6 +30,7 @@ export type PackagePublishResult = (
   name: string;
   version: string;
   distTag: string | undefined;
+  /** added by the `git` plugin */
   gitTag?: string;
   changelogs: ChangelogEntry[];
 };

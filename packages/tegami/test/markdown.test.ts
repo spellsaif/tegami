@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { parseChangelogFile } from "../src/markdown";
+import { parseChangelogFile } from "../src/changelog/parse";
 
 const tempDirs: string[] = [];
 

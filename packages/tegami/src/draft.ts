@@ -4,7 +4,7 @@ import type { TegamiContext } from "./context";
 import { simpleGenerator } from "./generators/simple";
 import { BumpType, bumpVersion, maxBump } from "./utils/semver";
 import type { WorkspacePackage } from "./workspace";
-import type { ChangelogEntry } from "./markdown";
+import type { ChangelogEntry } from "./changelog/parse";
 import { PlanStore, planStoreSchema } from "./schemas";
 import type { Awaitable, PublishPlanStatus } from "./types";
 

@@ -3,10 +3,10 @@ import { basename, join, resolve } from "node:path";
 import type { Heading, Root, RootContent } from "mdast";
 import { toMarkdown } from "mdast-util-to-markdown";
 import { remark } from "remark";
-import { changelogFrontmatterSchema } from "./schemas";
-import { isNodeError } from "./utils/error";
-import type { BumpType } from "./utils/semver";
-import { frontmatter } from "./utils/frontmatter";
+import { changelogFrontmatterSchema } from "../schemas";
+import { isNodeError } from "../utils/error";
+import type { BumpType } from "../utils/semver";
+import { frontmatter } from "../utils/frontmatter";
 
 export interface ChangelogEntry {
   id: string;

@@ -1,7 +1,7 @@
 import { SemVer } from "semver";
 import type { TegamiContext } from "./context";
 import type { DraftPlan, PackageOptions } from "./draft";
-import type { ChangelogEntry } from "./markdown";
+import type { ChangelogEntry } from "./changelog/parse";
 import type { PublishOptions, PublishResult } from "./publish";
 import type { NpmClient } from "./providers/npm";
 import type { WorkspacePackage } from "./workspace";
