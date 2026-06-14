@@ -38,11 +38,13 @@ describe("git utils", () => {
 
       await plugin.cli?.init?.call(pluginContext());
 
-      expect(exec.mock.calls.map(([command, args, options]) => ({
-        command,
-        args,
-        cwd: options?.nodeOptions?.cwd,
-      }))).toEqual([
+      expect(
+        exec.mock.calls.map(([command, args, options]) => ({
+          command,
+          args,
+          cwd: options?.nodeOptions?.cwd,
+        })),
+      ).toEqual([
         {
           command: "git",
           args: ["config", "user.name", "github-actions[bot]"],

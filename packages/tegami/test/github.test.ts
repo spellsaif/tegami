@@ -147,7 +147,12 @@ describe("github version pull request", () => {
 
       expect(exec).toHaveBeenCalledWith(
         "git",
-        ["remote", "set-url", "origin", "https://x-access-token:test-token@github.com/acme/repo.git"],
+        [
+          "remote",
+          "set-url",
+          "origin",
+          "https://x-access-token:test-token@github.com/acme/repo.git",
+        ],
         { nodeOptions: { cwd: "/repo" } },
       );
     } finally {

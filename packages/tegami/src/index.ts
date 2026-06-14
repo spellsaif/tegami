@@ -34,7 +34,6 @@ export interface Tegami {
   /** Internal APIs, do not use it unless you know what you are doing */
   _internal: {
     context(): Promise<TegamiContext>;
-    /** Discover workspace packages and their dependency relationships. */
     graph(): Promise<PackageGraph>;
     options: TegamiOptions;
   };
@@ -42,21 +41,26 @@ export interface Tegami {
 
 /** Create a Tegami project handle. */
 export function tegami(options: TegamiOptions = {}): Tegami {
+  const $context = init();
+  async function init() {
+    return createTegamiContext(options);
+  }
+
   return {
     async generateChangelog(createOptions = {}) {
-      return createChangelog(await createTegamiContext(options), createOptions);
+      return createChangelog(await $context, createOptions);
     },
     _internal: {
       options,
       context() {
-        return createTegamiContext(options);
+        return $context;
       },
       async graph() {
-        return (await createTegamiContext(options)).graph;
+        return (await $context).graph;
       },
     },
     async draft() {
-      const context = await createTegamiContext(options);
+      const context = await $context;
       const changelogs = await readChangelogEntries(context.cwd, context.changelogDir);
       let plan = createDraftPlan(changelogs, context);
 
@@ -68,7 +72,7 @@ export function tegami(options: TegamiOptions = {}): Tegami {
     },
 
     async publish(publishOptions = {}) {
-      const context = await createTegamiContext(options);
+      const context = await $context;
       const changelogs = await readChangelogEntries(context.cwd, context.changelogDir);
 
       // it implies a new versioning cycle has started

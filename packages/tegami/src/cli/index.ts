@@ -280,24 +280,21 @@ function changelogFilename(): string {
   return `${yyyy}-${mm}-${dd}-${hash}.md`;
 }
 
-async function initPlugins(tegami: Tegami): Promise<void> {
-  const context = await tegami._internal.context();
-
-  for (const plugin of context.plugins) {
-    try {
-      await plugin.cli?.init?.call(context);
-    } catch (error) {
-      const details = error instanceof Error ? error.message : String(error);
-      throw new Error(`Plugin "${plugin.name}" failed during cli.init:\n${details}`, {
-        cause: error,
-      });
-    }
-  }
-}
-
 async function runAction(tegami: Tegami, action: () => Awaitable<void>): Promise<void> {
   try {
-    await initPlugins(tegami);
+    const context = await tegami._internal.context();
+
+    for (const plugin of context.plugins) {
+      try {
+        await plugin.cli?.init?.call(context);
+      } catch (error) {
+        const details = error instanceof Error ? error.message : String(error);
+        throw new Error(`Plugin "${plugin.name}" failed during cli.init:\n${details}`, {
+          cause: error,
+        });
+      }
+    }
+
     await action();
   } catch (error) {
     process.exitCode = 1;

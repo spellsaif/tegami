@@ -53,5 +53,4 @@ jobs:
         if: steps.changelogs.outputs.has_changelogs == 'true'
         run: pnpm run version
         env:
-          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}

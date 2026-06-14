@@ -33,5 +33,4 @@ jobs:
       - name: Publish packages
         run: pnpm run release
         env:
-          GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
