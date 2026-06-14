@@ -78,8 +78,13 @@ describe("cargo packages", () => {
 
     expect(npmPackage.version).toBe("1.1.0");
     expect(table(core.package)?.version).toBe("1.1.0");
+    expect(table(binding.package)?.version).toBe("1.0.1");
     expect(table(table(binding.dependencies)?.acme_core)?.version).toBe("1.1.0");
-    expect(Object.keys(plan.packages)).toEqual(["npm:@acme/js", "cargo:acme_core"]);
+    expect(Object.keys(plan.packages)).toEqual([
+      "npm:@acme/js",
+      "cargo:acme_core",
+      "cargo:acme_binding",
+    ]);
   });
 
   test("allows npm packages and cargo crates with the same name", async () => {
@@ -139,6 +144,10 @@ describe("cargo packages", () => {
           name: "acme_core",
           state: "success",
         },
+        {
+          name: "acme_binding",
+          state: "success",
+        },
       ],
     });
     expect(
@@ -163,8 +172,14 @@ describe("cargo packages", () => {
         args: ["publish"],
         cwd: normalizeDirPath(join(cwd, "crates/core")),
       },
+      {
+        command: "cargo",
+        args: ["publish"],
+        cwd: normalizeDirPath(join(cwd, "crates/binding")),
+      },
     ]);
     expect(fetch).toHaveBeenCalledWith("https://crates.io/api/v1/crates/acme_core/1.1.0");
+    expect(fetch).toHaveBeenCalledWith("https://crates.io/api/v1/crates/acme_binding/1.0.1");
   });
 });
 

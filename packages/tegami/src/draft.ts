@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path, { dirname, join } from "node:path";
 import type { TegamiContext } from "./context";
 import { simpleGenerator } from "./generators/simple";
+import * as semver from "semver";
 import { BumpType, bumpVersion, maxBump } from "./utils/semver";
 import type { WorkspacePackage } from "./workspace";
 import type { ChangelogEntry } from "./changelog/parse";
@@ -252,6 +253,74 @@ export function createDraftPlan(changelogs: ChangelogEntry[], context: TegamiCon
   for (const [pkg, entries] of byPackage.entries()) {
     const plan = createPackagePlan(pkg, entries, context);
     if (plan) packages.set(pkg.id, plan);
+  }
+
+  // Fixed-point iteration loop for cascading bumps
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    // 1. Get current target versions for all planned packages
+    const targetVersions = new Map<string, string>();
+    for (const [id, pkgPlan] of packages) {
+      const pkg = context.graph.get(id);
+      if (pkg) {
+        targetVersions.set(id, bumpVersion(pkgPlan.fromVersion ?? pkg.version, pkgPlan.type));
+      }
+    }
+
+    // 2. Scan all packages for cascading bumps
+    for (const pkg of context.graph.getPackages()) {
+      if (!pkg.getDependencies) continue;
+
+      const deps = pkg.getDependencies();
+      for (const dep of deps) {
+        const depPkgs = context.graph.getByName(dep.name);
+        for (const depPkg of depPkgs) {
+          const targetVersion = targetVersions.get(depPkg.id);
+          if (!targetVersion) continue;
+
+          // Check if targetVersion satisfies dependency range
+          let rangeStr = dep.range;
+          if (rangeStr.startsWith("workspace:")) {
+            rangeStr = rangeStr.slice("workspace:".length);
+          }
+          if (rangeStr.startsWith("npm:")) {
+            const separator = rangeStr.lastIndexOf("@");
+            if (separator > 0) {
+              rangeStr = rangeStr.slice(separator + 1);
+            }
+          }
+
+          let satisfies = true;
+          if (rangeStr && rangeStr !== "*" && rangeStr !== "workspace:*") {
+            try {
+              if (semver.validRange(rangeStr)) {
+                satisfies = semver.satisfies(targetVersion, rangeStr);
+              } else {
+                satisfies = false;
+              }
+            } catch {
+              satisfies = false;
+            }
+          }
+
+          if (!satisfies) {
+            const existingPlan = packages.get(pkg.id);
+            if (!existingPlan) {
+              packages.set(pkg.id, {
+                type: "patch",
+                changelogIds: new Set(),
+                fromVersion: pkg.version,
+                distTag: context.options.packages?.[pkg.id]?.distTag ?? context.options.packages?.[pkg.name]?.distTag ?? pkg.distTag,
+                publish: context.options.packages?.[pkg.id]?.publish ?? context.options.packages?.[pkg.name]?.publish ?? pkg.publish,
+              });
+              changed = true;
+            }
+          }
+        }
+      }
+    }
   }
 
   return new DraftPlan(changelogMap, packages, context);

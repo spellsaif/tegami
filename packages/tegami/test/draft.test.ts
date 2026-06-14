@@ -279,6 +279,67 @@ describe("draft publish plans", () => {
     await expect(draft.createPublishPlan()).resolves.toBeUndefined();
   });
 
+  test("automatically triggers a cascading patch bump on dependents if the new version is out of range", async () => {
+    const cwd = await createWorkspace({ changelog: false });
+    tempDirs.push(cwd);
+
+    await writeFile(
+      join(cwd, ".tegami/change-core.md"),
+      `---
+packages: ["@acme/core"]
+---
+
+## Core minor update
+
+Core minor update.
+`,
+    );
+
+    const draft = await tegami({ cwd }).draft();
+
+    expect(draft.getPackage("npm:@acme/core")).toEqual(
+      expect.objectContaining({
+        type: "minor",
+        fromVersion: "1.0.0",
+      }),
+    );
+
+    expect(draft.getPackage("npm:@acme/ui")).toEqual(
+      expect.objectContaining({
+        type: "patch",
+        fromVersion: "1.0.0",
+      }),
+    );
+  });
+
+  test("does not trigger a cascading bump on dependents if the new version satisfies range", async () => {
+    const cwd = await createWorkspace({ changelog: false });
+    tempDirs.push(cwd);
+
+    await writeFile(
+      join(cwd, ".tegami/change-core.md"),
+      `---
+packages: ["@acme/core"]
+---
+
+### Core patch update
+
+Core patch update.
+`,
+    );
+
+    const draft = await tegami({ cwd }).draft();
+
+    expect(draft.getPackage("npm:@acme/core")).toEqual(
+      expect.objectContaining({
+        type: "patch",
+        fromVersion: "1.0.0",
+      }),
+    );
+
+    expect(draft.getPackage("npm:@acme/ui")).toBeUndefined();
+  });
+
   test("discovers packages with nested workspace globs", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "tegami-draft-"));
     tempDirs.push(cwd);

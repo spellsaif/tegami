@@ -82,6 +82,20 @@ export class NpmPackage extends WorkspacePackage {
   async write(): Promise<void> {
     await writeFile(join(this.path, "package.json"), `${JSON.stringify(this.manifest, null, 2)}\n`);
   }
+
+  getDependencies(): DependencySpec[] {
+    const specs: DependencySpec[] = [];
+    for (const field of DEP_FIELDS) {
+      const dependencies = this.manifest[field];
+      if (!dependencies) continue;
+
+      for (const [rawName, rawRange] of Object.entries(dependencies)) {
+        const spec = parseNpmDependency(rawName, rawRange);
+        if (spec) specs.push(spec);
+      }
+    }
+    return specs;
+  }
 }
 
 export type NpmClient = "npm" | "pnpm";

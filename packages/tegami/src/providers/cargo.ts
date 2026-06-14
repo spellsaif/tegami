@@ -6,7 +6,7 @@ import { glob } from "tinyglobby";
 import { x } from "tinyexec";
 import type { PlanStore } from "../schemas";
 import type { TegamiContext } from "../context";
-import type { TegamiPlugin, PublishPlanStatus, RegistryClient } from "../types";
+import type { TegamiPlugin, PublishPlanStatus, RegistryClient, DependencySpec } from "../types";
 import { isNodeError } from "../utils/error";
 import { PackageGraph, WorkspacePackage } from "../workspace";
 
@@ -74,6 +74,28 @@ export class CargoPackage extends WorkspacePackage {
 
   async write(): Promise<void> {
     await writeFile(join(this.path, "Cargo.toml"), stringify(this.manifest));
+  }
+
+  getDependencies(): DependencySpec[] {
+    const specs: DependencySpec[] = [];
+    for (const table of dependencyTables(this.manifest)) {
+      for (const [rawName, rawSpec] of Object.entries(table)) {
+        const spec = tableValue(rawSpec);
+        const packageName = stringValue(spec?.package) ?? rawName;
+
+        if (typeof rawSpec === "string") {
+          specs.push({ name: packageName, range: rawSpec });
+        } else if (spec) {
+          const version = stringValue(spec.version);
+          if (version) {
+            specs.push({ name: packageName, range: version });
+          } else {
+            specs.push({ name: packageName, range: "*" });
+          }
+        }
+      }
+    }
+    return specs;
   }
 
   private get packageInfo(): TomlTable {

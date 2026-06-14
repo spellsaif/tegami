@@ -25,6 +25,7 @@ export abstract class WorkspacePackage {
     context: TegamiContext,
   ): Awaitable<void>;
   write?(): Awaitable<void>;
+  getDependencies?(): DependencySpec[];
 
   protected async updateRange(
     context: TegamiContext,
