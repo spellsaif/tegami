@@ -8,7 +8,7 @@ import type { PlanStore } from "../schemas";
 import type { TegamiContext } from "../context";
 import type { TegamiPlugin, PublishPlanStatus, RegistryClient } from "../types";
 import { isNodeError } from "../utils/error";
-import { PackageGraph, WorkspacePackage } from "../workspace";
+import { PackageGraph, WorkspacePackage } from "../graph";
 
 const DEP_FIELDS = ["dependencies", "dev-dependencies", "build-dependencies"] as const;
 

@@ -7,6 +7,7 @@ import { execFailure } from "../utils/error";
 import { formatPackageVersion, formatVersionBump, previousVersion } from "../utils/semver";
 import { git, type GitPluginOptions } from "./git";
 import { isCI } from "../utils/constants";
+import type { ChangelogEntry } from "../changelog/parse";
 
 interface GithubRelease {
   /** Release title */
@@ -33,8 +34,10 @@ export interface GitHubPluginOptions extends GitPluginOptions {
   /** GitHub repository. */
   repo?: string;
 
-  /** override release details, return `false` to skip */
+  /** Override release details for a single package, return `false` to skip. */
   onCreateRelease?: (result: PackagePublishResult) => Awaitable<GithubRelease | false>;
+  /** Override release details when multiple packages share a git tag, return `false` to skip. */
+  onCreateGroupedRelease?: (packages: PackagePublishResult[]) => Awaitable<GithubRelease | false>;
 
   cli?: {
     /**
@@ -48,22 +51,30 @@ export interface GitHubPluginOptions extends GitPluginOptions {
 
 /** Create GitHub releases for successfully published packages after the whole plan succeeds. */
 export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
-  async function createGithubRelease(pkg: PackagePublishResult): Promise<void> {
-    if (!pkg.gitTag) return;
-    const release = (await options.onCreateRelease?.(pkg)) ?? {};
+  async function createGithubRelease(packages: PackagePublishResult[]): Promise<void> {
+    const primary = packages[0];
+    if (!primary?.gitTag) return;
+
+    const grouped = packages.length > 1;
+    const release = grouped
+      ? ((await options.onCreateGroupedRelease?.(packages)) ?? {})
+      : ((await options.onCreateRelease?.(primary)) ?? {});
     if (release === false) return;
 
     const prerelease =
-      release.prerelease ?? (pkg.distTag !== undefined && pkg.distTag !== "latest");
+      release.prerelease ??
+      (grouped
+        ? packages.some((pkg) => pkg.distTag !== undefined && pkg.distTag !== "latest")
+        : primary.distTag !== undefined && primary.distTag !== "latest");
 
     const args: string[] = [
       "release",
       "create",
-      pkg.gitTag,
+      primary.gitTag,
       "--title",
-      release.title ?? formatPackageVersion(pkg.name, pkg.version, pkg.distTag),
+      release.title ?? (grouped ? defaultGroupedTitle(packages) : defaultTitle(primary)),
       "--notes",
-      release.notes ?? defaultNotes(pkg),
+      release.notes ?? (grouped ? defaultGroupedNotes(packages) : defaultNotes(primary)),
     ];
 
     if (options.repo) {
@@ -77,7 +88,7 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
     const result = await x("gh", args);
     if (result.exitCode !== 0) {
       throw new Error(
-        execFailure(`Failed to create GitHub release for ${pkg.name}@${pkg.version}.`, result),
+        execFailure(`Failed to create GitHub release for ${primary.gitTag}.`, result),
       );
     }
   }
@@ -187,7 +198,9 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
       async afterPublish(result) {
         if (result.state !== "created") return;
 
-        await Promise.all(result.packages.map(createGithubRelease));
+        for (const packages of groupPackagesByGitTag(result.packages).values()) {
+          await createGithubRelease(packages);
+        }
       },
     },
   ];
@@ -248,13 +261,77 @@ function defaultVersionPRBody(draft: DraftPlan, context: TegamiContext): string 
   return sections.join("\n");
 }
 
+function groupPackagesByGitTag(
+  packages: PackagePublishResult[],
+): Map<string, PackagePublishResult[]> {
+  const groups = new Map<string, PackagePublishResult[]>();
+
+  for (const pkg of packages) {
+    if (!pkg.gitTag) continue;
+
+    const group = groups.get(pkg.gitTag);
+    if (group) group.push(pkg);
+    else groups.set(pkg.gitTag, [pkg]);
+  }
+
+  return groups;
+}
+
+function defaultTitle(pkg: PackagePublishResult): string {
+  return formatPackageVersion(pkg.name, pkg.version, pkg.distTag);
+}
+
+function defaultGroupedTitle(packages: PackagePublishResult[]): string {
+  const primary = packages[0]!;
+  const distTag = packages.every((pkg) => pkg.distTag === primary.distTag)
+    ? primary.distTag
+    : undefined;
+
+  return formatPackageVersion(
+    primary.gitTag!.slice(0, primary.gitTag!.lastIndexOf("@")),
+    primary.version,
+    distTag,
+  );
+}
+
 function defaultNotes(pkg: PackagePublishResult): string {
-  const entries = pkg.changelogs;
-  if (entries.length > 0) {
-    return entries
+  if (pkg.changelogs.length > 0) {
+    return pkg.changelogs
       .map((entry) => [`### ${entry.title}`, entry.content].filter(Boolean).join("\n\n"))
       .join("\n\n");
   }
 
   return `Published ${formatPackageVersion(pkg.name, pkg.version, pkg.distTag)}.`;
+}
+
+function defaultGroupedNotes(packages: PackagePublishResult[]): string {
+  const entries = uniqueChangelogs(packages);
+  const sections = [
+    packages
+      .map((pkg) => `- ${formatPackageVersion(pkg.name, pkg.version, pkg.distTag)}`)
+      .join("\n"),
+  ];
+
+  if (entries.length > 0) {
+    sections.push(
+      "",
+      entries
+        .map((entry) => [`### ${entry.title}`, entry.content].filter(Boolean).join("\n\n"))
+        .join("\n\n"),
+    );
+  } else {
+    sections.push("", `Published ${packages[0]!.gitTag}.`);
+  }
+
+  return sections.join("\n");
+}
+
+function uniqueChangelogs(packages: PackagePublishResult[]) {
+  const entries = new Map<string, ChangelogEntry>();
+
+  for (const pkg of packages) {
+    for (const entry of pkg.changelogs) entries.set(entry.id, entry);
+  }
+
+  return Array.from(entries.values());
 }

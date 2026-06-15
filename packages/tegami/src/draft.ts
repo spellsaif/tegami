@@ -3,18 +3,10 @@ import path, { dirname, join } from "node:path";
 import type { TegamiContext } from "./context";
 import { simpleGenerator } from "./generators/simple";
 import { BumpType, bumpVersion, maxBump } from "./utils/semver";
-import type { WorkspacePackage } from "./workspace";
+import type { WorkspacePackage } from "./graph";
 import type { ChangelogEntry } from "./changelog/parse";
 import { PlanStore, planStoreSchema } from "./schemas";
 import type { Awaitable, PublishPlanStatus } from "./types";
-
-/** Per-package options applied when creating publish plans. */
-export interface PackageOptions {
-  /** npm dist-tag used when publishing. */
-  distTag?: string;
-  /** Set to false to keep this package out of npm publishing. */
-  publish?: boolean;
-}
 
 export interface PackagePlan {
   type: BumpType;
@@ -142,16 +134,15 @@ export class DraftPlan {
 
       for (const [id, updatedDep] of updatedPackages) {
         const target = graph.get(id);
-        if (target) await pkg.updateDependency?.(target, updatedDep.version, this.context);
+        if (target) await pkg.updateDependency(target, updatedDep.version, this.context);
       }
 
       if (updated) {
-        pkg.setVersion?.(updated.version);
+        pkg.setVersion(updated.version);
         writes.push(this.appendChangelog(pkg, updated.plan));
       }
 
-      const write = pkg.write?.();
-      if (write) writes.push(write);
+      writes.push(pkg.write());
     }
 
     await Promise.all(writes);
@@ -182,10 +173,13 @@ export class DraftPlan {
     }
 
     const generated = await generator.generate.call(this.context, {
+      packageId: pkg.id,
       packageName: pkg.name,
       version: pkg.version,
       distTag: plan.distTag,
+      plan,
       changelogs,
+      _draft: this,
     });
 
     const path = join(pkg.path, "CHANGELOG.md");
@@ -236,8 +230,36 @@ export function createDraftPlan(changelogs: ChangelogEntry[], context: TegamiCon
 
   const packages = new Map<string, PackagePlan>();
   for (const [pkg, entries] of byPackage.entries()) {
-    const plan = createPackagePlan(pkg, entries, context);
-    if (plan) packages.set(pkg.id, plan);
+    if (entries.length === 0) continue;
+    packages.set(pkg.id, createPackagePlan(pkg, entries, context));
+  }
+
+  // TODO: create a special type of package plan to represent sync-version updates
+  for (const group of context.graph.getGroups()) {
+    if (!group.options.syncVersion || group.packages.length <= 1) continue;
+
+    let bumpType: BumpType | undefined;
+    for (const member of group.packages) {
+      const plan = packages.get(member.id);
+      if (!plan) continue;
+
+      if (!bumpType) {
+        bumpType = plan.type;
+      } else {
+        bumpType = maxBump(bumpType, plan.type);
+      }
+    }
+
+    if (!bumpType) continue;
+    for (const member of group.packages) {
+      let plan = packages.get(member.id);
+      if (!plan) {
+        plan = createPackagePlan(member, [], context);
+        packages.set(member.id, plan);
+      }
+
+      plan.type = bumpType;
+    }
   }
 
   return new DraftPlan(changelogMap, packages, context);
@@ -247,12 +269,9 @@ function createPackagePlan(
   pkg: WorkspacePackage,
   entries: ChangelogEntry[],
   context: TegamiContext,
-): PackagePlan | null {
-  if (entries.length === 0) return null;
-
-  const packageOptions =
-    context.options.packages?.[pkg.id] ?? context.options.packages?.[pkg.name] ?? {};
-  let type: BumpType = entries[0]!.type;
+): PackagePlan {
+  const packageOptions = pkg.getPackageOptions();
+  let type: BumpType = "patch";
   const changelogIds = new Set<string>();
 
   for (const entry of entries) {
@@ -260,10 +279,20 @@ function createPackagePlan(
     type = maxBump(type, entry.type);
   }
 
+  const resolveDistTag = () => {
+    if (packageOptions.distTag !== undefined) return packageOptions.distTag;
+    if (packageOptions.prerelease !== undefined) return packageOptions.prerelease;
+
+    const group = packageOptions.group && context.graph.getGroup(packageOptions.group);
+    if (group && group.options.prerelease) return group.options.prerelease;
+
+    return pkg.distTag;
+  };
+
   return {
     type,
     changelogIds,
-    distTag: packageOptions.distTag ?? pkg.distTag,
+    distTag: resolveDistTag(),
     publish: packageOptions.publish ?? pkg.publish,
   };
 }

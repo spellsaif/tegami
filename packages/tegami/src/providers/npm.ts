@@ -19,7 +19,7 @@ import type {
   TegamiPlugin,
 } from "../types";
 import { execFailure, isNodeError } from "../utils/error";
-import { WorkspacePackage } from "../workspace";
+import { WorkspacePackage } from "../graph";
 import { detect } from "package-manager-detector";
 
 const DEP_FIELDS = [

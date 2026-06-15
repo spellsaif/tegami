@@ -1,10 +1,10 @@
 import { SemVer } from "semver";
 import type { TegamiContext } from "./context";
-import type { DraftPlan, PackageOptions } from "./draft";
+import type { DraftPlan, PackagePlan } from "./draft";
 import type { ChangelogEntry } from "./changelog/parse";
 import type { PublishOptions, PublishResult } from "./publish";
 import type { NpmClient } from "./providers/npm";
-import type { WorkspacePackage } from "./workspace";
+import type { WorkspacePackage } from "./graph";
 import type { PlanStore } from "./schemas";
 
 /** Generates changelog content for a package release. */
@@ -12,15 +12,19 @@ export interface LogGenerator {
   generate(
     this: TegamiContext,
     opts: {
+      packageId: string;
       packageName: string;
       version: string;
       distTag?: string;
       changelogs: ChangelogEntry[];
+
+      plan: PackagePlan;
+      _draft: DraftPlan;
     },
   ): string | Promise<string>;
 }
 
-export interface TegamiOptions {
+export interface TegamiOptions<Groups extends string = string> {
   /** Workspace root. Defaults to the current working directory. */
   cwd?: string;
   /** Directory containing pending changelog markdown files. */
@@ -30,11 +34,33 @@ export interface TegamiOptions {
   /** Changelog generator used when creating a publish plan. */
   generator?: LogGenerator;
   /** Per-package release and publish options keyed by package name. */
-  packages?: Record<string, PackageOptions>;
+  packages?: Record<string, PackageOptions<NoInfer<Groups>>>;
   plugins?: TegamiPluginOption[];
-
   /** Package manager command used for npm registry operations. */
   npmClient?: NpmClient;
+
+  groups?: Record<Groups, GroupOptions>;
+}
+
+export interface GroupOptions {
+  /** default prerelease tag for group packages. */
+  prerelease?: string;
+
+  /** all packages in the group will use the same version (obtained from the highest one) */
+  syncVersion?: boolean;
+  /** when multiple packages in the group are published, only one git tag will be created (as well as GitHub release) */
+  syncGitTag?: boolean;
+}
+
+export interface PackageOptions<Group extends string = string> {
+  /** prerelease tag. */
+  prerelease?: string;
+  /** npm dist-tag used when publishing. */
+  distTag?: string;
+  /** Set to false to keep this package out of npm publishing. */
+  publish?: boolean;
+  /** the group of this package, ignored if the group doesn't exist */
+  group?: Group;
 }
 
 export type TegamiPluginOption = TegamiPlugin | TegamiPluginOption[];

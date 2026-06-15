@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { PlanStore } from "../src/schemas";
 import { NpmRegistryClient } from "../src/providers/npm";
 import { NpmPackage } from "../src/providers/npm";
-import { PackageGraph } from "../src/workspace";
+import { PackageGraph } from "../src/graph";
 
 vi.mock("tinyexec", () => ({
   x: vi.fn(),

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createTegamiContext } from "../src/context";
 import { NpmPackage } from "../src/providers/npm";
 import type { TegamiPlugin } from "../src/types";
-import { WorkspacePackage } from "../src/workspace";
+import { WorkspacePackage } from "../src/graph";
 
 vi.mock("package-manager-detector", () => ({
   detect: vi.fn(),
@@ -147,6 +147,12 @@ class TestPackage extends WorkspacePackage {
   constructor(readonly manager: string) {
     super();
   }
+
+  setVersion(): void {}
+
+  async updateDependency(): Promise<void> {}
+
+  async write(): Promise<void> {}
 }
 
 function npmPackage(): NpmPackage {

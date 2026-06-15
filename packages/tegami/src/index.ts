@@ -9,7 +9,7 @@ import type { PublishOptions, PublishResult } from "./publish";
 import { planStoreSchema } from "./schemas";
 import type { TegamiOptions } from "./types";
 import { isNodeError } from "./utils/error";
-import { PackageGraph } from "./workspace";
+import { PackageGraph } from "./graph";
 
 export type { PackagePublishResult, PublishOptions, PublishResult } from "./publish";
 export type { CreateChangelogOptions, CreatedChangelog } from "./changelog/create";
@@ -18,10 +18,12 @@ export type {
   TegamiOptions,
   TegamiPlugin,
   RegistryClient,
+  GroupOptions,
+  PackageOptions,
   TegamiPluginOption,
 } from "./types";
-export type { DraftPlan, PackageOptions, PackagePlan } from "./draft";
-export type { PackageGraph, WorkspacePackage } from "./workspace";
+export type { DraftPlan, PackagePlan } from "./draft";
+export type { PackageGraph, PackageGroup, WorkspacePackage } from "./graph";
 
 export interface Tegami {
   /** Create pending changelog files from git commit history. */
@@ -40,7 +42,9 @@ export interface Tegami {
 }
 
 /** Create a Tegami project handle. */
-export function tegami(options: TegamiOptions = {}): Tegami {
+export function tegami<const Groups extends string = string>(
+  options: TegamiOptions<Groups> = {},
+): Tegami {
   const $context = init();
   async function init() {
     return createTegamiContext(options);

@@ -4,7 +4,7 @@ import type { PackagePublishResult, PublishResult } from "../src";
 import { DraftPlan, type PackagePlan } from "../src/draft";
 import { github } from "../src/plugins/github";
 import type { TegamiPlugin } from "../src/types";
-import { PackageGraph, WorkspacePackage } from "../src/workspace";
+import { PackageGraph, WorkspacePackage } from "../src/graph";
 
 vi.mock("tinyexec", () => ({
   x: vi.fn(),
@@ -152,6 +152,96 @@ describe("github release plugin", () => {
       "--repo",
       "acme/repo",
       "--prerelease",
+    ]);
+  });
+
+  test("summarizes all packages sharing a git tag in release notes", async () => {
+    const plugin = githubPlugin({ repo: "acme/repo" });
+
+    await plugin.afterPublish?.call(
+      publishContext(),
+      publishResult({
+        packages: [
+          packageResult({
+            name: "@acme/core",
+            gitTag: "acme@1.0.1",
+            changelogs: [
+              {
+                id: "change-1",
+                filename: "change.md",
+                packages: new Set(["group:acme"]),
+                type: "minor",
+                title: "Add shared API",
+                content: "Useful release note.",
+              },
+            ],
+          }),
+          packageResult({
+            name: "@acme/ui",
+            gitTag: "acme@1.0.1",
+            changelogs: [
+              {
+                id: "change-1",
+                filename: "change.md",
+                packages: new Set(["group:acme"]),
+                type: "minor",
+                title: "Add shared API",
+                content: "Useful release note.",
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(exec).toHaveBeenCalledTimes(1);
+    expect(exec.mock.calls[0]?.[1]).toEqual([
+      "release",
+      "create",
+      "acme@1.0.1",
+      "--title",
+      "acme@1.0.1",
+      "--notes",
+      "- @acme/core@1.0.1\n- @acme/ui@1.0.1\n\n### Add shared API\n\nUseful release note.",
+      "--repo",
+      "acme/repo",
+    ]);
+  });
+
+  test("uses onCreateGroupedRelease for packages sharing a git tag", async () => {
+    const plugin = githubPlugin({
+      repo: "acme/repo",
+      onCreateGroupedRelease(packages) {
+        return {
+          title: `Group release ${packages[0]!.gitTag}`,
+          notes: packages.map((pkg) => pkg.name).join(", "),
+        };
+      },
+      onCreateRelease() {
+        throw new Error("onCreateRelease should not be called for grouped releases");
+      },
+    });
+
+    await plugin.afterPublish?.call(
+      publishContext(),
+      publishResult({
+        packages: [
+          packageResult({ name: "@acme/core", gitTag: "acme@1.0.1" }),
+          packageResult({ name: "@acme/ui", gitTag: "acme@1.0.1" }),
+        ],
+      }),
+    );
+
+    expect(exec.mock.calls[0]?.[1]).toEqual([
+      "release",
+      "create",
+      "acme@1.0.1",
+      "--title",
+      "Group release acme@1.0.1",
+      "--notes",
+      "@acme/core, @acme/ui",
+      "--repo",
+      "acme/repo",
     ]);
   });
 });

@@ -6,8 +6,17 @@ const paper = tegami({
   // create release on GitHub
   plugins: [github()],
   packages: {
-    "my-pkg": {
-      distTag: "alpha",
+    "fumadocs-core": {
+      group: "fumadocs",
+    },
+    "fumadocs-ui": {
+      group: "fumadocs",
+    },
+  },
+  groups: {
+    fumadocs: {
+      syncGitTag: true,
+      syncVersion: true,
     },
   },
 });

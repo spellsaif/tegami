@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import type { TegamiOptions, RegistryClient, TegamiPlugin, TegamiPluginOption } from "./types";
 import { cargo } from "./providers/cargo";
 import { npm } from "./providers/npm";
-import { PackageGraph, type WorkspacePackage } from "./workspace";
+import { PackageGraph, type WorkspacePackage } from "./graph";
 
 export interface TegamiContext {
   cwd: string;
@@ -58,6 +58,21 @@ export async function createTegamiContext(options: TegamiOptions = {}): Promise<
 
   for (const plugin of ctx.plugins) {
     await plugin.resolve?.call(ctx);
+  }
+
+  for (const [name, groupOptions] of Object.entries(options.groups ?? {})) {
+    graph.registerGroup(name, groupOptions);
+  }
+
+  for (const pkg of graph.getPackages()) {
+    const packageOptions = options.packages?.[pkg.id] ?? options.packages?.[pkg.name];
+    if (!packageOptions) continue;
+
+    pkg.setPackageOptions(packageOptions);
+
+    if (packageOptions.group) {
+      graph.addGroupMember(packageOptions.group, pkg.id);
+    }
   }
 
   for (const plugin of ctx.plugins) {

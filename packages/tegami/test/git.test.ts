@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { x } from "tinyexec";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { git } from "../src/plugins/git";
-import { PackageGraph, WorkspacePackage } from "../src/workspace";
+import { PackageGraph, WorkspacePackage } from "../src/graph";
 import type { PackagePublishResult, PublishResult } from "../src";
 
 vi.mock("tinyexec", async (importOriginal) => {
@@ -127,17 +127,8 @@ describe("git utils", () => {
             "refs/tags/@acme/core@1.0.1",
           ],
           "command": "git",
-          "cwd": "/repo/packages/core",
+          "cwd": "/repo",
           "throwOnError": undefined,
-        },
-        {
-          "args": [
-            "tag",
-            "@acme/core@1.0.1",
-          ],
-          "command": "git",
-          "cwd": "/repo/packages/core",
-          "throwOnError": true,
         },
         {
           "args": [
@@ -147,7 +138,16 @@ describe("git utils", () => {
             "refs/tags/@acme/ui@1.0.1",
           ],
           "command": "git",
-          "cwd": "/repo/packages/ui",
+          "cwd": "/repo",
+          "throwOnError": undefined,
+        },
+        {
+          "args": [
+            "tag",
+            "@acme/core@1.0.1",
+          ],
+          "command": "git",
+          "cwd": "/repo",
           "throwOnError": undefined,
         },
         {
@@ -156,8 +156,8 @@ describe("git utils", () => {
             "@acme/ui@1.0.1",
           ],
           "command": "git",
-          "cwd": "/repo/packages/ui",
-          "throwOnError": true,
+          "cwd": "/repo",
+          "throwOnError": undefined,
         },
       ]
     `);
@@ -208,7 +208,7 @@ describe("git utils", () => {
               "refs/tags/@acme/core@1.0.1",
             ],
             "command": "git",
-            "cwd": "/repo/packages/core",
+            "cwd": "/repo",
             "throwOnError": undefined,
           },
           {
@@ -217,8 +217,8 @@ describe("git utils", () => {
               "@acme/core@1.0.1",
             ],
             "command": "git",
-            "cwd": "/repo/packages/core",
-            "throwOnError": true,
+            "cwd": "/repo",
+            "throwOnError": undefined,
           },
           {
             "args": [
@@ -238,7 +238,7 @@ describe("git utils", () => {
     }
   });
 
-  test("marks the package failed when git tag creation fails", async () => {
+  test("marks the publish result failed when git tag creation fails", async () => {
     const plugin = git();
     exec.mockImplementation((_command, args = []) => {
       if (args.at(0) === "rev-parse") {
@@ -248,7 +248,7 @@ describe("git utils", () => {
       }
 
       if (args.at(0) === "tag") {
-        throw new Error("tag failed");
+        return commandResult({ exitCode: 1, stderr: "tag failed" });
       }
 
       throw new Error(`Unexpected command: ${args.join(" ")}`);
@@ -258,13 +258,7 @@ describe("git utils", () => {
 
     expect(result).toMatchObject({
       state: "failed",
-      packages: [
-        {
-          name: "@acme/core",
-          state: "failed",
-          error: "tag failed",
-        },
-      ],
+      error: expect.stringContaining("tag failed"),
     });
   });
 });
@@ -313,6 +307,12 @@ class TestPackage extends WorkspacePackage {
   ) {
     super();
   }
+
+  setVersion(): void {}
+
+  async updateDependency(): Promise<void> {}
+
+  async write(): Promise<void> {}
 }
 
 function publishResult(overrides: Partial<PublishResult> = {}): PublishResult {
