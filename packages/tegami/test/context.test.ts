@@ -87,6 +87,15 @@ describe("tegami context", () => {
     expect(exec).not.toHaveBeenCalled();
   });
 
+  test("defaults the publish plan path", async () => {
+    const context = await createTegamiContext({
+      cwd: "/repo",
+      npmClient: "npm",
+    });
+
+    expect(context.planPath).toBe("/repo/.tegami/publish-plan");
+  });
+
   test("stores plugins in enforce order", async () => {
     const plugins = [
       plugin("default-a"),

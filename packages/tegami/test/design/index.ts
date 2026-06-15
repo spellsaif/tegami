@@ -23,7 +23,7 @@ export async function version() {
     console.log(pkg?.changelogIds);
   }
 
-  // update versions, generate .tegami/publish-plan.json, and delete all changelogs
+  // update versions, generate .tegami/publish-plan, and delete all changelogs
   // it refuses to create a new plan until the current one has finished publishing
   await draft.createPublishPlan();
 
@@ -43,7 +43,7 @@ export async function versionWithAutoDispose() {
 }
 
 export async function publish() {
-  /// publish according to `publish-plan.json`.
+  /// publish according to `.tegami/publish-plan`.
   // existing package versions are treated as successful, so reruns are safe after partial failures.
   const result = await paper.publish();
 

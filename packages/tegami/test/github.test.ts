@@ -483,7 +483,7 @@ function publishContext() {
   return {
     cwd: "/repo",
     changelogDir: ".tegami",
-    planPath: "/repo/.tegami/publish-plan.json",
+    planPath: "/repo/.tegami/publish-plan",
     options: {},
     plugins: [],
     publishOptions: {},
@@ -546,7 +546,7 @@ function registryClient() {
 
 function publishResult(overrides: Partial<PublishResult> = {}): PublishResult {
   return {
-    planPath: "/repo/.tegami/publish-plan.json",
+    planPath: "/repo/.tegami/publish-plan",
     _rawPlan: {
       id: "tegami-test",
       createdAt: "2026-01-01T00:00:00.000Z",

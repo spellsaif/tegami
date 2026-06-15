@@ -84,7 +84,7 @@ packages: ["@acme/core"]
 async function writePublishPlan(cwd: string): Promise<void> {
   const changelog = await readFile(join(cwd, ".tegami/change.md"), "utf8").catch(() => undefined);
 
-  await writeJson(join(cwd, ".tegami/publish-plan.json"), {
+  await writeJson(join(cwd, ".tegami/publish-plan"), {
     id: "tegami-plugin-test",
     createdAt: "2026-01-01T00:00:00.000Z",
     changelogs: changelog

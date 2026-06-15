@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { TegamiOptions, RegistryClient, TegamiPlugin, TegamiPluginOption } from "./types";
 import { cargo } from "./providers/cargo";
 import { npm } from "./providers/npm";
@@ -17,12 +17,15 @@ export interface TegamiContext {
 
 export async function createTegamiContext(options: TegamiOptions = {}): Promise<TegamiContext> {
   const cwd = resolve(options.cwd ?? process.cwd());
+  const changelogDir = options.changelogDir ?? ".tegami";
   const graph = new PackageGraph();
   const registryClients = new Map<string, RegistryClient>();
   const ctx: TegamiContext = {
     cwd,
-    changelogDir: options.changelogDir ?? ".tegami",
-    planPath: resolve(cwd, options.planPath ?? join(".tegami", "publish-plan.json")),
+    changelogDir,
+    planPath: options.planPath
+      ? resolve(cwd, options.planPath)
+      : resolve(cwd, changelogDir, "publish-plan"),
     options,
     plugins: resolvePlugins([npm(options.npmClient), cargo(), ...(options.plugins ?? [])]),
     graph,

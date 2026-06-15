@@ -286,7 +286,7 @@ Not versioned yet.
 
     await expect(tegami({ cwd }).publish()).resolves.toEqual({
       state: "skipped",
-      planPath: join(cwd, ".tegami/publish-plan.json"),
+      planPath: join(cwd, ".tegami/publish-plan"),
     });
   });
 
@@ -329,7 +329,7 @@ async function createPublishFixture(options: { registry?: string } = {}): Promis
 }> {
   const cwd = await mkdtemp(join(tmpdir(), "tegami-publish-"));
   const packagePath = join(cwd, "packages/core");
-  const planPath = join(cwd, ".tegami/publish-plan.json");
+  const planPath = join(cwd, ".tegami/publish-plan");
   tempDirs.push(cwd);
 
   await mkdir(packagePath, { recursive: true });
@@ -378,7 +378,7 @@ async function createMultiPackagePublishFixture(): Promise<{
   const cwd = await mkdtemp(join(tmpdir(), "tegami-publish-"));
   const corePath = join(cwd, "packages/core");
   const uiPath = join(cwd, "packages/ui");
-  const planPath = join(cwd, ".tegami/publish-plan.json");
+  const planPath = join(cwd, ".tegami/publish-plan");
   tempDirs.push(cwd);
 
   await mkdir(corePath, { recursive: true });

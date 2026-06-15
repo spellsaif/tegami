@@ -9,7 +9,7 @@ WIP.
 ### Versioning
 
 `tegami().draft()` creates a draft plan intance, allowing consumers to modify the plan, and apply the plan to bump/overwrite package versions.
-A publish plan will be stored in `.tegami/publish-plan.json` after applying.
+A publish plan will be stored in `.tegami/publish-plan` after applying.
 
 Publish plan files do not store mutable status. This keeps CI publishing simple: a release job can publish from the committed plan without needing to write a follow-up commit that marks the plan complete or removes it.
 

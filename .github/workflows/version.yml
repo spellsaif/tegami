@@ -23,7 +23,7 @@ jobs:
         id: changelogs
         shell: bash
         run: |
-          if [ -f ".tegami/publish-plan.json" ]; then
+          if [ -f ".tegami/publish-plan" ]; then
             echo "has_changelogs=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

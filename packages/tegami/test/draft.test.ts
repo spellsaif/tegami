@@ -108,10 +108,8 @@ describe("draft publish plans", () => {
 
     const rawPlan = await readJson<{
       packages: Record<string, { version?: string; distTag?: string; changelogIds: string[] }>;
-    }>(join(cwd, ".tegami/publish-plan.json"));
-    const plan = planStoreSchema.decode(
-      await readFile(join(cwd, ".tegami/publish-plan.json"), "utf8"),
-    );
+    }>(join(cwd, ".tegami/publish-plan"));
+    const plan = planStoreSchema.decode(await readFile(join(cwd, ".tegami/publish-plan"), "utf8"));
 
     expect({
       changelogs: plan.changelogs,
@@ -198,7 +196,7 @@ describe("draft publish plans", () => {
     const cwd = await createWorkspace();
     tempDirs.push(cwd);
 
-    await writeJson(join(cwd, ".tegami/publish-plan.json"), {
+    await writeJson(join(cwd, ".tegami/publish-plan"), {
       id: "tegami-existing",
       createdAt: "2026-01-01T00:00:00.000Z",
       changelogs: {},

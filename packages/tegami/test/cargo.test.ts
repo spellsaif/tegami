@@ -72,9 +72,7 @@ describe("cargo packages", () => {
     const npmPackage = JSON.parse(await readFile(join(cwd, "packages/js/package.json"), "utf8"));
     const core = await readCargo(join(cwd, "crates/core"));
     const binding = await readCargo(join(cwd, "crates/binding"));
-    const plan = planStoreSchema.decode(
-      await readFile(join(cwd, ".tegami/publish-plan.json"), "utf8"),
-    );
+    const plan = planStoreSchema.decode(await readFile(join(cwd, ".tegami/publish-plan"), "utf8"));
 
     expect(npmPackage.version).toBe("1.1.0");
     expect(table(core.package)?.version).toBe("1.1.0");
@@ -91,9 +89,7 @@ describe("cargo packages", () => {
 
     const npmPackage = JSON.parse(await readFile(join(cwd, "packages/pkg-a/package.json"), "utf8"));
     const crate = await readCargo(join(cwd, "crates/pkg-a"));
-    const plan = planStoreSchema.decode(
-      await readFile(join(cwd, ".tegami/publish-plan.json"), "utf8"),
-    );
+    const plan = planStoreSchema.decode(await readFile(join(cwd, ".tegami/publish-plan"), "utf8"));
 
     expect(draft.getPackageIds()).toEqual(["npm:pkg-a", "cargo:pkg-a"]);
     expect(npmPackage.version).toBe("1.1.0");
