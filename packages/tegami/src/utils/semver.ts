@@ -10,29 +10,6 @@ export function formatPackageVersion(name: string, version: string, distTag?: st
   return `${name}@${version}${formatDistTag(distTag)}`;
 }
 
-// TODO: improve draft plan API such that it does not rely on this to obtain the original version before bump
-export function previousVersion(version: string, type: BumpType): string {
-  const parsed = parse(version);
-  if (!parsed) {
-    throw new Error(`Invalid semver version: ${version}`);
-  }
-
-  if (type === "major") {
-    parsed.major = Math.max(0, parsed.major - 1);
-    parsed.minor = 0;
-    parsed.patch = 0;
-  } else if (type === "minor") {
-    parsed.minor = Math.max(0, parsed.minor - 1);
-    parsed.patch = 0;
-  } else {
-    parsed.patch = Math.max(0, parsed.patch - 1);
-  }
-
-  parsed.prerelease = [];
-  parsed.build = [];
-  return parsed.format();
-}
-
 export function formatVersionBump(
   name: string,
   from: string,
@@ -48,8 +25,20 @@ export function maxBump(a: BumpType, b: BumpType): BumpType {
   return "patch";
 }
 
-export function bumpVersion(version: string, type: BumpType): string {
-  const next = inc(version, type);
+export function bumpVersion(version: string, type: BumpType, prerelease?: string): string {
+  let next: string | null;
+
+  if (prerelease) {
+    const parsed = parse(version);
+    if (parsed?.prerelease[0] === prerelease) {
+      next = inc(version, "prerelease", prerelease);
+    } else {
+      const preType = type === "major" ? "premajor" : type === "minor" ? "preminor" : "prepatch";
+      next = inc(version, preType, prerelease);
+    }
+  } else {
+    next = inc(version, type);
+  }
 
   if (!next) {
     throw new Error(`Invalid semver version: ${version}`);

@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import type { TegamiOptions, RegistryClient, TegamiPlugin, TegamiPluginOption } from "./types";
 import { cargo } from "./providers/cargo";
 import { npm } from "./providers/npm";
+import { handlePluginError } from "./utils/error";
 import { PackageGraph, type WorkspacePackage } from "./graph";
 
 export interface TegamiContext {
@@ -53,11 +54,11 @@ export async function createTegamiContext(options: TegamiOptions = {}): Promise<
   };
 
   for (const plugin of ctx.plugins) {
-    await plugin.init?.call(ctx);
+    await handlePluginError(plugin, "init", () => plugin.init?.call(ctx));
   }
 
   for (const plugin of ctx.plugins) {
-    await plugin.resolve?.call(ctx);
+    await handlePluginError(plugin, "resolve", () => plugin.resolve?.call(ctx));
   }
 
   for (const [name, groupOptions] of Object.entries(options.groups ?? {})) {
@@ -76,7 +77,9 @@ export async function createTegamiContext(options: TegamiOptions = {}): Promise<
   }
 
   for (const plugin of ctx.plugins) {
-    const clients = await plugin.createRegistryClient?.call(ctx);
+    const clients = await handlePluginError(plugin, "createRegistryClient", () =>
+      plugin.createRegistryClient?.call(ctx),
+    );
     if (!clients) continue;
 
     for (const client of Array.isArray(clients) ? clients : [clients]) {

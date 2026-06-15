@@ -8,7 +8,7 @@ import { publishFromPlan } from "./publish";
 import type { PublishOptions, PublishResult } from "./publish";
 import { planStoreSchema } from "./schemas";
 import type { TegamiOptions } from "./types";
-import { isNodeError } from "./utils/error";
+import { isNodeError, handlePluginError } from "./utils/error";
 import { PackageGraph } from "./graph";
 
 export type { PackagePublishResult, PublishOptions, PublishResult } from "./publish";
@@ -69,7 +69,10 @@ export function tegami<const Groups extends string = string>(
       let plan = createDraftPlan(changelogs, context);
 
       for (const plugin of context.plugins) {
-        plan = (await plugin.initPlan?.call(context, plan)) ?? plan;
+        const next = await handlePluginError(plugin, "initPlan", () =>
+          plugin.initPlan?.call(context, plan),
+        );
+        plan = next ?? plan;
       }
 
       return plan;
@@ -97,7 +100,10 @@ export function tegami<const Groups extends string = string>(
 
       const publishCtx = { ...context, publishOptions };
       for (const plugin of context.plugins) {
-        result = (await plugin.afterPublish?.call(publishCtx, result)) ?? result;
+        const next = await handlePluginError(plugin, "afterPublish", () =>
+          plugin.afterPublish?.call(publishCtx, result),
+        );
+        result = next ?? result;
       }
 
       return result;

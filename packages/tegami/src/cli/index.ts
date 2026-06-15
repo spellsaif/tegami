@@ -16,8 +16,10 @@ import type { DraftPlan, PublishResult, Tegami } from "..";
 import type { Awaitable } from "../types";
 import type { BumpType } from "../utils/semver";
 import { isCI } from "../utils/constants";
+import { handlePluginError } from "../utils/error";
 
 export interface TegamiCLIOptions {
+  /** create a custom draft plan, it must be editable */
   version?: () => Awaitable<DraftPlan>;
   publish?: () => Awaitable<PublishResult>;
 }
@@ -168,9 +170,19 @@ async function versionPackages(
   intro("Version Packages");
 
   const { version: customVersion } = options.cli;
+  const context = await tegami._internal.context();
   const draft = customVersion ? await customVersion() : await tegami.draft();
-  const packageIds = draft.getPackageIds();
+  if (!draft.editable()) {
+    throw new Error(`The custom "version" hook must return an editable draft plan`);
+  }
 
+  for (const plugin of context.plugins) {
+    await handlePluginError(plugin, "cli.afterVersion", () =>
+      plugin.cli?.afterVersion?.call(context, draft),
+    );
+  }
+
+  const packageIds = draft.getPackageIds();
   if (packageIds.length === 0) {
     note("No pending changelog entries matched workspace packages.", "Nothing to version");
     outro("No versions changed.");
@@ -187,30 +199,22 @@ async function versionPackages(
     "Release plan",
   );
 
-  if (draft.editable()) {
-    const s = spinner();
-    s.start("Updating package versions");
+  const s = spinner();
+  s.start("Updating package versions");
 
-    try {
-      await draft.createPublishPlan();
-    } catch (error) {
-      s.stop("Failed to create publish plan");
-      throw error;
-    }
-
-    s.stop("Package versions updated");
+  try {
+    await draft.createPublishPlan();
+  } catch (error) {
+    s.stop("Failed to create publish plan");
+    throw error;
   }
 
-  const context = await tegami._internal.context();
+  s.stop("Package versions updated");
+
   for (const plugin of context.plugins) {
-    try {
-      await plugin.cli?.afterVersion?.call(context, draft);
-    } catch (error) {
-      const details = error instanceof Error ? error.message : String(error);
-      throw new Error(`Plugin "${plugin.name}" failed during afterVersion:\n${details}`, {
-        cause: error,
-      });
-    }
+    await handlePluginError(plugin, "cli.publishPlanCreated", () =>
+      plugin.cli?.publishPlanCreated?.call(context, draft),
+    );
   }
 
   outro("Publish plan created.");
@@ -285,14 +289,7 @@ async function runAction(tegami: Tegami, action: () => Awaitable<void>): Promise
     const context = await tegami._internal.context();
 
     for (const plugin of context.plugins) {
-      try {
-        await plugin.cli?.init?.call(context);
-      } catch (error) {
-        const details = error instanceof Error ? error.message : String(error);
-        throw new Error(`Plugin "${plugin.name}" failed during cli.init:\n${details}`, {
-          cause: error,
-        });
-      }
+      await handlePluginError(plugin, "cli.init", () => plugin.cli?.init?.call(context));
     }
 
     await action();

@@ -52,7 +52,7 @@ Useful release note.
     expect(draft.getPackageIds().sort()).toEqual(["npm:@acme/core", "npm:@acme/ui"]);
   });
 
-  test("applies group prerelease as distTag unless overridden", async () => {
+  test("applies group prerelease to version and keeps distTag separate", async () => {
     const cwd = await createWorkspace();
     tempDirs.push(cwd);
 
@@ -65,16 +65,25 @@ Useful release note.
       },
       packages: {
         "@acme/core": { group: "acme" },
-        "@acme/ui": { group: "acme", distTag: "beta" },
+        "@acme/ui": { group: "acme", distTag: "next" },
       },
     }).draft();
 
     expect({
-      core: draft.getPackage("npm:@acme/core")?.distTag,
-      ui: draft.getPackage("npm:@acme/ui")?.distTag,
+      coreDistTag: draft.getPackage("npm:@acme/core")?.distTag,
+      uiDistTag: draft.getPackage("npm:@acme/ui")?.distTag,
     }).toEqual({
-      core: "alpha",
-      ui: "beta",
+      coreDistTag: undefined,
+      uiDistTag: "next",
+    });
+
+    await draft.createPublishPlan();
+
+    expect(await readJson(join(cwd, "packages/core/package.json"))).toMatchObject({
+      version: "1.1.0-alpha.0",
+    });
+    expect(await readJson(join(cwd, "packages/ui/package.json"))).toMatchObject({
+      version: "1.1.0-alpha.0",
     });
   });
 

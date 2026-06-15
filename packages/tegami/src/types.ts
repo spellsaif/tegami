@@ -43,7 +43,7 @@ export interface TegamiOptions<Groups extends string = string> {
 }
 
 export interface GroupOptions {
-  /** default prerelease tag for group packages. */
+  /** Prerelease identifier appended to bumped versions (e.g. `alpha` → `1.1.0-alpha.0`). */
   prerelease?: string;
 
   /** all packages in the group will use the same version (obtained from the highest one) */
@@ -53,7 +53,7 @@ export interface GroupOptions {
 }
 
 export interface PackageOptions<Group extends string = string> {
-  /** prerelease tag. */
+  /** Prerelease identifier appended to bumped versions (e.g. `alpha` → `1.1.0-alpha.0`). */
   prerelease?: string;
   /** npm dist-tag used when publishing. */
   distTag?: string;
@@ -88,8 +88,12 @@ export interface TegamiPlugin {
   cli?: {
     /** Called once before a CLI command runs. */
     init?(this: TegamiContext): Awaitable<void>;
-    /** Called after `tegami version` creates a publish plan. */
+
+    /** Called after `tegami version` returns a draft plan. */
     afterVersion?(this: TegamiContext, draft: DraftPlan): Awaitable<void>;
+
+    /** Called after `tegami version` creates a publish plan. */
+    publishPlanCreated?(this: TegamiContext, draft: DraftPlan): Awaitable<void>;
   };
 
   /**

@@ -125,7 +125,7 @@ export class DraftPlan {
 
       updatedPackages.set(id, {
         plan,
-        version: bumpVersion(pkg.version, plan.type),
+        version: bumpVersion(pkg.version, plan.type, resolvePrerelease(pkg, this.context)),
       });
     }
 
@@ -281,11 +281,6 @@ function createPackagePlan(
 
   const resolveDistTag = () => {
     if (packageOptions.distTag !== undefined) return packageOptions.distTag;
-    if (packageOptions.prerelease !== undefined) return packageOptions.prerelease;
-
-    const group = packageOptions.group && context.graph.getGroup(packageOptions.group);
-    if (group && group.options.prerelease) return group.options.prerelease;
-
     return pkg.distTag;
   };
 
@@ -295,4 +290,21 @@ function createPackagePlan(
     distTag: resolveDistTag(),
     publish: packageOptions.publish ?? pkg.publish,
   };
+}
+
+export function resolvePrerelease(
+  pkg: WorkspacePackage,
+  context: TegamiContext,
+): string | undefined {
+  const packageOptions = pkg.getPackageOptions();
+
+  if (packageOptions.prerelease !== undefined) return packageOptions.prerelease;
+
+  const groupName = packageOptions.group;
+  if (groupName) {
+    const group = context.graph.getGroup(groupName);
+    if (group?.options.prerelease) return group.options.prerelease;
+  }
+
+  return undefined;
 }

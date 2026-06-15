@@ -1,13 +1,14 @@
 import { x } from "tinyexec";
+import { prerelease as getPrerelease } from "semver";
 import type { TegamiContext } from "../context";
-import type { DraftPlan } from "../draft";
+import type { ChangelogEntry } from "../changelog/parse";
+import { resolvePrerelease, type DraftPlan } from "../draft";
 import type { PackagePublishResult } from "../publish";
 import type { Awaitable, TegamiPlugin } from "../types";
 import { execFailure } from "../utils/error";
-import { formatPackageVersion, formatVersionBump, previousVersion } from "../utils/semver";
+import { bumpVersion, formatPackageVersion, formatVersionBump } from "../utils/semver";
 import { git, type GitPluginOptions } from "./git";
 import { isCI } from "../utils/constants";
-import type { ChangelogEntry } from "../changelog/parse";
 
 interface GithubRelease {
   /** Release title */
@@ -64,8 +65,8 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
     const prerelease =
       release.prerelease ??
       (grouped
-        ? packages.some((pkg) => pkg.distTag !== undefined && pkg.distTag !== "latest")
-        : primary.distTag !== undefined && primary.distTag !== "latest");
+        ? packages.some((pkg) => getPrerelease(pkg.version) !== null)
+        : getPrerelease(primary.version) !== null);
 
     const args: string[] = [
       "release",
@@ -238,10 +239,14 @@ function defaultVersionPRBody(draft: DraftPlan, context: TegamiContext): string 
     const pkg = context.graph.get(id);
     if (!pkg) continue;
 
-    const publish = packagePlan.publish ? "" : " (no publish)";
-    const previous = previousVersion(pkg.version, packagePlan.type);
+    const publishTxt = packagePlan.publish ? "" : " (no publish)";
     packageLines.push(
-      `- ${formatVersionBump(pkg.name, previous, pkg.version, packagePlan.distTag)}${publish}`,
+      `- ${formatVersionBump(
+        pkg.name,
+        pkg.version,
+        bumpVersion(pkg.version, packagePlan.type, resolvePrerelease(pkg, context)),
+        packagePlan.distTag,
+      )}${publishTxt}`,
     );
   }
 

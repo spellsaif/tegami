@@ -14,6 +14,13 @@ describe("semver helpers", () => {
     expect(bumpVersion("1.2.3", "major")).toBe("2.0.0");
   });
 
+  test("bumps prerelease versions", () => {
+    expect(bumpVersion("1.0.0", "minor", "alpha")).toBe("1.1.0-alpha.0");
+    expect(bumpVersion("1.1.0-alpha.0", "minor", "alpha")).toBe("1.1.0-alpha.1");
+    expect(bumpVersion("1.0.0-alpha.2", "major", "alpha")).toBe("1.0.0-alpha.3");
+    expect(bumpVersion("1.0.0", "major", "alpha")).toBe("2.0.0-alpha.0");
+  });
+
   test("rejects invalid versions", () => {
     expect(() => bumpVersion("not-a-version", "patch")).toThrow(/Invalid semver version/);
   });

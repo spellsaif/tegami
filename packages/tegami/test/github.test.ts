@@ -131,24 +131,24 @@ describe("github release plugin", () => {
     `);
   });
 
-  test("marks non-latest dist tags as prerelease by default", async () => {
+  test("marks semver prerelease versions as GitHub prerelease by default", async () => {
     const plugin = githubPlugin({ repo: "acme/repo" });
 
     await plugin.afterPublish?.call(
       publishContext(),
       publishResult({
-        packages: [packageResult({ distTag: "beta" })],
+        packages: [packageResult({ version: "1.0.1-beta.0", gitTag: "@acme/core@1.0.1-beta.0" })],
       }),
     );
 
     expect(exec.mock.calls[0]?.[1]).toEqual([
       "release",
       "create",
-      "@acme/core@1.0.1",
+      "@acme/core@1.0.1-beta.0",
       "--title",
-      "@acme/core@1.0.1 (beta)",
+      "@acme/core@1.0.1-beta.0",
       "--notes",
-      "Published @acme/core@1.0.1 (beta).",
+      "Published @acme/core@1.0.1-beta.0.",
       "--repo",
       "acme/repo",
       "--prerelease",
@@ -583,14 +583,21 @@ function publishContext() {
 }
 
 function testPackage(): WorkspacePackage {
-  return {
-    name: "@acme/core",
-    path: "/repo/packages/core",
-    manager: "test",
-    version: "1.1.0",
-    publish: true,
-    id: "test:@acme/core",
-  } as WorkspacePackage;
+  return new TestPackage();
+}
+
+class TestPackage extends WorkspacePackage {
+  readonly name = "@acme/core";
+  readonly path = "/repo/packages/core";
+  readonly manager = "test";
+  readonly version = "1.0.0";
+  readonly publish = true;
+
+  setVersion(): void {}
+
+  async updateDependency(): Promise<void> {}
+
+  async write(): Promise<void> {}
 }
 
 function versionDraft(context = publishContext()): DraftPlan {

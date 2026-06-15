@@ -1,5 +1,6 @@
 import type { TegamiContext } from "./context";
 import type { Awaitable, DependencySpec, GroupOptions, PackageOptions } from "./types";
+import { handlePluginError } from "./utils/error";
 import * as semver from "semver";
 
 /** Package discovered in the workspace. */
@@ -32,7 +33,9 @@ export abstract class WorkspacePackage {
     next: semver.SemVer,
   ): Promise<DependencySpec> {
     for (const plugin of context.plugins) {
-      const result = await plugin.onUpdateRange?.call(context, this, spec, next);
+      const result = await handlePluginError(plugin, "onUpdateRange", () =>
+        plugin.onUpdateRange?.call(context, this, spec, next),
+      );
       if (result) return result;
     }
 
