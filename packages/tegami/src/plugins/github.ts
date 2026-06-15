@@ -6,7 +6,7 @@ import type { DraftPlan } from "../draft";
 import type { PackagePublishResult } from "../publish";
 import type { Awaitable, TegamiPlugin } from "../types";
 import { execFailure } from "../utils/error";
-import { formatPackageVersion, formatVersionBump } from "../utils/semver";
+import { formatNpmDistTag, formatPackageVersion } from "../utils/semver";
 import { git, type GitPluginOptions } from "./git";
 import { isCI } from "../utils/constants";
 
@@ -137,13 +137,9 @@ export function github(options: GitHubPluginOptions = {}): TegamiPlugin[] {
       if (!pkg) continue;
 
       const publishTxt = packagePlan.publish ? "" : " (no publish)";
+      const distTagTxt = formatNpmDistTag(packagePlan.npm?.distTag);
       packageLines.push(
-        `- ${formatVersionBump(
-          pkg.name,
-          cliOriginalPackageVersions.get(pkg.id) ?? pkg.version,
-          pkg.version,
-          packagePlan.npm?.distTag,
-        )}${publishTxt}`,
+        `- ${pkg.name}@${cliOriginalPackageVersions.get(pkg.id) ?? pkg.version} → ${pkg.name}@${pkg.version}${distTagTxt}${publishTxt}`,
       );
     }
 

@@ -122,7 +122,7 @@ describe("cargo packages", () => {
       return commandResult();
     });
 
-    const result = await tegami({ cwd, npmClient: "npm" }).publish();
+    const result = await tegami({ cwd, npm: { client: "npm" } }).publish();
 
     expect(result).toMatchObject({
       state: "created",

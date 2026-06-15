@@ -30,7 +30,7 @@ describe("tegami context", () => {
   test("uses an explicit npm client without detecting", async () => {
     const context = await createTegamiContext({
       cwd: "/repo",
-      npmClient: "npm",
+      npm: { client: "npm" },
     });
     const pkg = npmPackage();
     context.graph.add(pkg);
@@ -90,7 +90,6 @@ describe("tegami context", () => {
   test("defaults the publish plan path", async () => {
     const context = await createTegamiContext({
       cwd: "/repo",
-      npmClient: "npm",
     });
 
     expect(context.planPath).toBe("/repo/.tegami/publish-plan");
@@ -108,7 +107,6 @@ describe("tegami context", () => {
 
     const context = await createTegamiContext({
       cwd: "/repo",
-      npmClient: "npm",
       plugins,
     });
 

@@ -6,19 +6,18 @@ import { createCli } from "tegami/cli";
 import { github } from "tegami/plugins/github";
 
 const cwd = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-
-await createCli(
-  tegami({
-    cwd,
-    plugins: [
-      github({
-        repo: "fuma-nama/tegami",
-      }),
-    ],
-    packages: {
-      "npm:tegami": {
-        prerelease: "beta",
-      },
+const paper = tegami({
+  cwd,
+  plugins: [
+    github({
+      repo: "fuma-nama/tegami",
+    }),
+  ],
+  packages: {
+    "npm:tegami": {
+      prerelease: "beta",
     },
-  }),
-).parseAsync();
+  },
+});
+
+await createCli(paper).parseAsync();

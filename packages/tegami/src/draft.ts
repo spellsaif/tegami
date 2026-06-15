@@ -11,7 +11,9 @@ import type { Awaitable, PublishPlanStatus } from "./types";
 export interface PackagePlan {
   type: BumpType;
   changelogIds: Set<string>;
+  prerelease?: string;
   publish: boolean;
+
   npm?: {
     /** npm dist-tag used when publishing. */
     distTag?: string;
@@ -128,7 +130,7 @@ export class DraftPlan {
 
       updatedPackages.set(id, {
         plan,
-        version: bumpVersion(pkg.version, plan.type, resolvePrerelease(pkg, this.context)),
+        version: bumpVersion(pkg.version, plan.type, plan.prerelease),
       });
     }
 
@@ -265,6 +267,15 @@ export function createDraftPlan(changelogs: ChangelogEntry[], context: TegamiCon
     }
   }
 
+  // apply group configs
+  for (const group of context.graph.getGroups()) {
+    for (const member of group.packages) {
+      const plan = packages.get(member.id);
+      if (!plan) continue;
+      plan.prerelease ??= group.options.prerelease;
+    }
+  }
+
   return new DraftPlan(changelogMap, packages, context);
 }
 
@@ -288,21 +299,4 @@ function createPackagePlan(
     changelogIds,
     publish: defaults.publish ?? false,
   };
-}
-
-export function resolvePrerelease(
-  pkg: WorkspacePackage,
-  context: TegamiContext,
-): string | undefined {
-  const packageOptions = pkg.getPackageOptions();
-
-  if (packageOptions.prerelease !== undefined) return packageOptions.prerelease;
-
-  const groupName = packageOptions.group;
-  if (groupName) {
-    const group = context.graph.getGroup(groupName);
-    if (group?.options.prerelease) return group.options.prerelease;
-  }
-
-  return undefined;
 }

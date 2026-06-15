@@ -13,13 +13,7 @@ import {
   type PackageManifest,
   type PlanStore,
 } from "../schemas";
-import type {
-  PublishPlanStatus,
-  RegistryClient,
-  DependencySpec,
-  Awaitable,
-  TegamiPlugin,
-} from "../types";
+import type { PublishPlanStatus, RegistryClient, DependencySpec, TegamiPlugin } from "../types";
 import { execFailure, isNodeError } from "../utils/error";
 import { WorkspacePackage } from "../graph";
 import { detect } from "package-manager-detector";
@@ -89,7 +83,7 @@ export class NpmPackage extends WorkspacePackage {
   }
 }
 
-export type NpmClient = "npm" | "pnpm";
+type NpmClient = "npm" | "pnpm";
 
 interface NpmDependencySpec extends DependencySpec {
   protocol?: "npm" | "workspace";
@@ -100,11 +94,10 @@ export class NpmRegistryClient implements RegistryClient {
 
   // package@version -> if published
   #versionMap = new Map<string, Promise<boolean>>();
-  #resolvedClient: Awaitable<NpmClient> | undefined;
 
   constructor(
     private readonly cwd: string,
-    private readonly npmClient: NpmClient | undefined = undefined,
+    private readonly client: NpmClient,
     private readonly graph: { get(id: string): WorkspacePackage | undefined },
   ) {}
 
@@ -123,7 +116,7 @@ export class NpmRegistryClient implements RegistryClient {
         const args = ["view", `${pkg.name}@${version}`, "version", "--json"];
         if (registry) args.push("--registry", registry);
 
-        const result = await x(await this.resolveClient(), args, {
+        const result = await x(this.client, args, {
           nodeOptions: {
             cwd: this.cwd,
           },
@@ -149,13 +142,12 @@ export class NpmRegistryClient implements RegistryClient {
     pkg: NpmPackage,
     { packageStore }: { store: PlanStore; packageStore: PackagePlanStore },
   ) {
-    const client = await this.resolveClient();
     const args = ["publish"];
     const distTag = packageStore.npm?.distTag;
     if (distTag) args.push("--tag", distTag);
-    if (client === "pnpm") args.push("--no-git-checks");
+    if (this.client === "pnpm") args.push("--no-git-checks");
 
-    const result = await x(client, args, {
+    const result = await x(this.client, args, {
       nodeOptions: {
         cwd: pkg.path,
       },
@@ -178,21 +170,6 @@ export class NpmRegistryClient implements RegistryClient {
     }
 
     return { state: "success" };
-  }
-
-  private resolveClient(): Awaitable<NpmClient> {
-    if (!this.#resolvedClient) {
-      this.#resolvedClient =
-        this.npmClient ??
-        detect({
-          cwd: this.cwd,
-        }).then((result) => {
-          if (result?.name === "pnpm") return "pnpm";
-          return "npm";
-        });
-    }
-
-    return this.#resolvedClient;
   }
 }
 
@@ -249,10 +226,29 @@ function formatNpmDependency(spec: DependencySpec): string {
   return spec.range;
 }
 
-export function npm(client?: NpmClient): TegamiPlugin {
+export interface NpmPluginOptions {
+  /** Package manager command used for npm registry operations. */
+  client?: NpmClient;
+}
+
+export function npm({ client: defaultClient }: NpmPluginOptions = {}): TegamiPlugin {
+  let client: NpmClient;
+
   return {
     name: "npm",
     enforce: "pre",
+    async init() {
+      if (defaultClient) {
+        client = defaultClient;
+        return;
+      }
+
+      const result = await detect({
+        cwd: this.cwd,
+      });
+      if (result?.name === "pnpm") client = "pnpm";
+      else client = "npm";
+    },
     async resolve() {
       await discoverNpmPackages(this.cwd, (pkg) => this.graph.add(pkg));
     },

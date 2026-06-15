@@ -28,7 +28,7 @@ export async function createTegamiContext(options: TegamiOptions = {}): Promise<
       ? resolve(cwd, options.planPath)
       : resolve(cwd, changelogDir, "publish-plan"),
     options,
-    plugins: resolvePlugins([npm(options.npmClient), cargo(), ...(options.plugins ?? [])]),
+    plugins: resolvePlugins([npm(options.npm), cargo(), ...(options.plugins ?? [])]),
     graph,
     getRegistryClient(pkgOrId) {
       let client: RegistryClient | undefined;

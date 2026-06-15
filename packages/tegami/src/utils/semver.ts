@@ -2,21 +2,12 @@ import { inc, parse } from "semver";
 
 export type BumpType = "major" | "minor" | "patch";
 
-function formatDistTag(distTag?: string): string {
+export function formatNpmDistTag(distTag?: string): string {
   return distTag && distTag !== "latest" ? ` (${distTag})` : "";
 }
 
 export function formatPackageVersion(name: string, version: string, distTag?: string): string {
-  return `${name}@${version}${formatDistTag(distTag)}`;
-}
-
-export function formatVersionBump(
-  name: string,
-  from: string,
-  to: string,
-  distTag?: string,
-): string {
-  return `${name}@${from} → ${name}@${to}${formatDistTag(distTag)}`;
+  return `${name}@${version}${formatNpmDistTag(distTag)}`;
 }
 
 export function maxBump(a: BumpType, b: BumpType): BumpType {

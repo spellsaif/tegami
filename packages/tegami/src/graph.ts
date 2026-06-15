@@ -57,9 +57,10 @@ export abstract class WorkspacePackage {
 
   /** Override defaults when building a draft plan. */
   onPlan(_context: TegamiContext): Partial<PackagePlan> {
-    const { publish, npm } = this.opts;
+    const { publish, prerelease, npm } = this.opts;
     return {
       publish,
+      prerelease,
       npm: npm ? { distTag: npm.distTag } : undefined,
     };
   }

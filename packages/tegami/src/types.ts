@@ -3,7 +3,7 @@ import type { TegamiContext } from "./context";
 import type { DraftPlan, PackagePlan } from "./draft";
 import type { ChangelogEntry } from "./changelog/parse";
 import type { PublishOptions, PublishResult } from "./publish";
-import type { NpmClient } from "./providers/npm";
+import type { NpmPluginOptions } from "./providers/npm";
 import type { WorkspacePackage } from "./graph";
 import type { PackagePlanStore, PlanStore } from "./schemas";
 
@@ -35,10 +35,10 @@ export interface TegamiOptions<Groups extends string = string> {
   /** Per-package release and publish options keyed by package name. */
   packages?: Record<string, PackageOptions<NoInfer<Groups>>>;
   plugins?: TegamiPluginOption[];
-  /** Package manager command used for npm registry operations. */
-  npmClient?: NpmClient;
 
   groups?: Record<Groups, GroupOptions>;
+
+  npm?: NpmPluginOptions;
 }
 
 export interface GroupOptions {

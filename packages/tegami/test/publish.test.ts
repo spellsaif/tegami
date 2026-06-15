@@ -65,7 +65,7 @@ describe("publish plans", () => {
         await createTegamiContext({
           cwd,
           planPath,
-          npmClient: "npm",
+          npm: { client: "npm" },
         }),
         {
           dryRun: false,
@@ -186,7 +186,6 @@ describe("publish plans", () => {
       await createTegamiContext({
         cwd,
         planPath,
-        npmClient: "npm",
       }),
     );
 
@@ -226,7 +225,6 @@ describe("publish plans", () => {
         await createTegamiContext({
           cwd,
           planPath,
-          npmClient: "pnpm",
         }),
         {
           dryRun: false,
