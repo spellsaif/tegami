@@ -7,7 +7,7 @@ import { x } from "tinyexec";
 import type { TegamiContext } from "../context";
 import {
   packageManifestSchema,
-  workspacePatternsSchema,
+  pnpmWorkspaceSchema,
   type PackageManifest,
   type PlanStore,
 } from "../schemas";
@@ -257,9 +257,22 @@ export function npm(client?: NpmClient): TegamiPlugin {
 }
 
 async function discoverNpmPackages(cwd: string, add: (pkg: NpmPackage) => void): Promise<void> {
-  const patterns = await readWorkspacePatterns(cwd);
+  let patterns: string[];
+  const rootManifest = await readManifest(cwd).catch(() => undefined);
+  const pnpmPatterns = await readFile(join(cwd, "pnpm-workspace.yaml"), "utf8")
+    .then((content) => pnpmWorkspaceSchema.parse(load(content) ?? {}))
+    .catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") return undefined;
+      throw error;
+    });
+
+  if (pnpmPatterns) {
+    patterns = pnpmPatterns.packages ?? ["."];
+  } else {
+    patterns = rootManifest?.workspaces ?? ["."];
+  }
+
   const candidatePaths = await expandWorkspacePatterns(cwd, patterns);
-  const rootManifestPromise = readManifest(cwd).catch(() => undefined);
   const manifests = await Promise.all(
     candidatePaths.map((path) =>
       readManifest(path)
@@ -268,31 +281,14 @@ async function discoverNpmPackages(cwd: string, add: (pkg: NpmPackage) => void):
     ),
   );
 
-  const rootManifest = await rootManifestPromise;
-  if (rootManifest?.name && rootManifest.version && rootManifest.private !== true) {
+  if (rootManifest) {
     add(new NpmPackage(cwd, rootManifest));
   }
 
   for (const entry of manifests) {
-    if (!entry?.manifest.name || !entry.manifest.version) continue;
+    if (!entry?.manifest) continue;
     add(new NpmPackage(entry.path, entry.manifest));
   }
-}
-
-async function readWorkspacePatterns(cwd: string): Promise<string[]> {
-  const pnpmPatterns = await readFile(join(cwd, "pnpm-workspace.yaml"), "utf8")
-    .then((content) => workspacePatternsSchema.parse(load(content) ?? {}))
-    .catch((error: unknown) => {
-      if (isNodeError(error) && error.code === "ENOENT") return undefined;
-      throw error;
-    });
-
-  if (pnpmPatterns) {
-    return pnpmPatterns;
-  }
-
-  const rootManifest = await readManifest(cwd).catch(() => undefined);
-  return rootManifest?.workspaces ?? ["."];
 }
 
 async function expandWorkspacePatterns(cwd: string, patterns: string[]): Promise<string[]> {
@@ -316,5 +312,9 @@ async function expandWorkspacePatterns(cwd: string, patterns: string[]): Promise
 
 async function readManifest(packagePath: string): Promise<PackageManifest> {
   const content = await readFile(join(packagePath, "package.json"), "utf8");
-  return packageManifestSchema.parse(JSON.parse(content));
+  const parsed = JSON.parse(content);
+
+  // validation only
+  packageManifestSchema.parse(parsed);
+  return parsed;
 }

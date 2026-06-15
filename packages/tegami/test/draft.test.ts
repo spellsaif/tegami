@@ -70,35 +70,34 @@ describe("draft publish plans", () => {
     `);
 
     await draft.createPublishPlan();
-
-    expect({
-      core: await readJson<PackageManifest>(join(cwd, "packages/core/package.json")),
-      ui: await readJson<PackageManifest>(join(cwd, "packages/ui/package.json")),
-    }).toMatchInlineSnapshot(`
-      {
-        "core": {
-          "name": "@acme/core",
-          "version": "1.1.0",
-        },
-        "ui": {
-          "dependencies": {
-            "@acme/core": "^1.0.0",
-            "@acme/core-alias": "npm:@acme/core@1.1.0",
-          },
-          "devDependencies": {
-            "@acme/core": "workspace:^1.0.0",
-          },
-          "name": "@acme/ui",
-          "optionalDependencies": {
-            "@acme/core": "1.1.0",
-          },
-          "peerDependencies": {
-            "@acme/core": "workspace:*",
-          },
-          "version": "1.1.0",
-        },
+    expect(await readFile(join(cwd, "packages/core/package.json"), "utf-8")).toMatchInlineSnapshot(`
+      "{
+        "name": "@acme/core",
+        "version": "1.1.0"
       }
+      "
     `);
+    expect(await readFile(join(cwd, "packages/ui/package.json"), "utf-8")).toMatchInlineSnapshot(`
+      "{
+        "name": "@acme/ui",
+        "version": "1.1.0",
+        "dependencies": {
+          "@acme/core": "^1.0.0",
+          "@acme/core-alias": "npm:@acme/core@1.1.0"
+        },
+        "devDependencies": {
+          "@acme/core": "workspace:^1.0.0"
+        },
+        "peerDependencies": {
+          "@acme/core": "workspace:*"
+        },
+        "optionalDependencies": {
+          "@acme/core": "1.1.0"
+        }
+      }
+      "
+    `);
+
     expect(await readFile(join(cwd, "packages/core/CHANGELOG.md"), "utf8")).toContain(
       "## @acme/core@1.1.0 (alpha)",
     );

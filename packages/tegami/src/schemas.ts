@@ -25,19 +25,13 @@ const jsonCodec = <T extends z.core.$ZodType>(schema: T) =>
     encode: (value) => JSON.stringify(value),
   });
 
-export const workspacePatternsSchema = z
-  .union([
-    z.array(z.string()),
-    z
-      .looseObject({
-        packages: z.array(z.string()).optional(),
-      })
-      .transform((workspaces) => workspaces.packages ?? ["."]),
-  ])
-  .pipe(z.array(z.string()));
+export const pnpmWorkspaceSchema = z.looseObject({
+  packages: z.array(z.string()).optional(),
+});
 
+// must not have any asymmetric properties, because we directly return the original object, this is only for validation to preserve key order
 export const packageManifestSchema = z.looseObject({
-  name: z.string().optional(),
+  name: z.string(),
   version: z.string().optional(),
   private: z.boolean().optional(),
   publishConfig: z
@@ -47,7 +41,7 @@ export const packageManifestSchema = z.looseObject({
       tag: z.string().optional(),
     })
     .optional(),
-  workspaces: workspacePatternsSchema.optional(),
+  workspaces: z.array(z.string()).optional(),
   dependencies: stringRecordSchema.optional(),
   devDependencies: stringRecordSchema.optional(),
   peerDependencies: stringRecordSchema.optional(),
