@@ -22,9 +22,11 @@ export function git(options: GitPluginOptions = {}): TegamiPlugin {
   const { createTags = true, pushTags = isCI() } = options;
 
   function resolveGitTag(context: TegamiContext, result: PackagePublishResult): string {
-    const pkg = context.graph.get(result.id);
-    const groupName = pkg?.getPackageOptions().group;
-    const group = groupName ? context.graph.getGroup(groupName) : undefined;
+    const { graph } = context;
+    const pkg = graph.get(result.id);
+    if (!pkg) return `${result.name}@${result.version}`;
+
+    const group = graph.getPackageGroup(pkg.id);
     if (group?.options.syncGitTag) {
       return `${group.name}@${result.version}`;
     }

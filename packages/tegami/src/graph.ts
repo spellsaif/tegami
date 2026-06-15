@@ -74,7 +74,13 @@ export interface PackageGroup {
 
 /** Dependency graph for discovered workspace packages. */
 export class PackageGraph {
-  private readonly byId = new Map<string, WorkspacePackage>();
+  private readonly packages = new Map<
+    string,
+    {
+      value: WorkspacePackage;
+      group?: PackageGroup;
+    }
+  >();
   private readonly groups = new Map<string, PackageGroup>();
 
   constructor(packages: WorkspacePackage[] = []) {
@@ -83,27 +89,31 @@ export class PackageGraph {
     }
   }
 
-  getPackages() {
-    return Array.from(this.byId.values());
+  getPackages(): WorkspacePackage[] {
+    const out: WorkspacePackage[] = [];
+    for (const pkg of this.packages.values()) {
+      out.push(pkg.value);
+    }
+    return out;
   }
 
   /** Get a package by exact id. */
   get(id: string): WorkspacePackage | undefined {
-    return this.byId.get(id);
+    return this.packages.get(id)?.value;
   }
 
   /** Get packages by id, `group:name`, or every package matching a name. */
   getByName(nameOrId: string): WorkspacePackage[] {
-    const exact = this.byId.get(nameOrId);
-    if (exact) return [exact];
+    const exact = this.packages.get(nameOrId);
+    if (exact) return [exact.value];
 
     if (nameOrId.startsWith("group:")) {
       return this.getGroup(nameOrId.slice("group:".length))?.packages ?? [];
     }
 
     const out: WorkspacePackage[] = [];
-    for (const pkg of this.byId.values()) {
-      if (pkg.name === nameOrId) out.push(pkg);
+    for (const { value } of this.packages.values()) {
+      if (value.name === nameOrId) out.push(value);
     }
     return out;
   }
@@ -111,17 +121,20 @@ export class PackageGraph {
   /** scan package into graph, if the package id already exists, replace the existing one in graph */
   add(pkg: WorkspacePackage): void {
     this.delete(pkg.id);
-
-    this.byId.set(pkg.id, pkg);
+    this.packages.set(pkg.id, { value: pkg });
   }
 
   delete(id: string): void {
-    this.byId.delete(id);
+    this.packages.delete(id);
 
     for (const group of this.groups.values()) {
       const index = group.packages.findIndex((pkg) => pkg.id === id);
       if (index >= 0) group.packages.splice(index, 1);
     }
+  }
+
+  getPackageGroup(pkgId: string) {
+    return this.packages.get(pkgId)?.group;
   }
 
   getGroups(): PackageGroup[] {
@@ -144,12 +157,13 @@ export class PackageGraph {
     return group;
   }
 
-  addGroupMember(group: string, id: string): void {
-    const entry = this.groups.get(group);
-    const pkg = this.byId.get(id);
-    if (!entry || !pkg || entry.packages.some((member) => member.id === id)) return;
+  addGroupMember(groupId: string, id: string): void {
+    const group = this.groups.get(groupId);
+    const pkg = this.packages.get(id);
+    if (!group || !pkg || pkg.group) return;
 
-    entry.packages.push(pkg);
+    pkg.group = group;
+    group.packages.push(pkg.value);
   }
 
   removeGroupMember(group: string, id: string): void {
