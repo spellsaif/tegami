@@ -82,7 +82,7 @@ export interface TegamiPlugin {
     this: TegamiContext,
   ): Awaitable<RegistryClient | RegistryClient[] | void | undefined>;
 
-  /** Called after Tegami builds the initial draft plan and before it is returned. */
+  /** Called when Tegami creates an empty draft plan. */
   initPlan?(this: TegamiContext, plan: DraftPlan): Awaitable<DraftPlan | void | undefined>;
   /** Called when Tegami applies the draft plan. */
   applyPlan?(this: TegamiContext, draft: DraftPlan): Awaitable<void>;

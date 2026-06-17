@@ -19,7 +19,7 @@ import { isCI } from "../utils/constants";
 import { handlePluginError } from "../utils/error";
 
 export interface TegamiCLIOptions {
-  /** create a custom draft plan, it must be editable */
+  /** create a custom draft plan, it must not be applied */
   version?: () => Awaitable<DraftPlan>;
   publish?: () => Awaitable<PublishResult>;
 }
@@ -177,8 +177,8 @@ async function versionPackages(
   const { version: customVersion } = options.cli;
   const context = await tegami._internal.context();
   const draft = customVersion ? await customVersion() : await tegami.draft();
-  if (!draft.editable()) {
-    throw new Error(`The custom "version" hook must return an editable draft plan`);
+  if (!draft.canApply()) {
+    throw new Error(`The draft plan from custom "version" hook must not be applied`);
   }
 
   for (const plugin of context.plugins) {

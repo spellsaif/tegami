@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe("draft publish plans", () => {
-  test("builds an editable draft and writes an executable publish plan", async () => {
+  test("builds draft and writes an executable publish plan", async () => {
     const cwd = await createWorkspace();
     tempDirs.push(cwd);
 
@@ -66,6 +66,10 @@ describe("draft publish plans", () => {
           "npm:@acme/ui",
         ],
         "ui": {
+          "bumpReasons": [
+            "update dependency "@acme/core-alias"",
+            "update dependency "@acme/core"",
+          ],
           "bumpVersion": [Function],
           "changelogIds": [
             "change.md:0",

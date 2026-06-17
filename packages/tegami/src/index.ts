@@ -28,7 +28,7 @@ export type { PackageGraph, PackageGroup, WorkspacePackage } from "./graph";
 export interface Tegami {
   /** Create pending changelog files from git commit history. */
   generateChangelog(options?: CreateChangelogOptions): Promise<CreatedChangelog[]>;
-  /** Build an editable draft from pending changelog files. */
+  /** Build a draft from pending changelog files. */
   draft(): Promise<DraftPlan>;
   /** Publish the current publish plan. */
   publish(options?: PublishOptions): Promise<PublishResult>;

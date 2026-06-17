@@ -12,6 +12,7 @@ import { PackageGraph, WorkspacePackage } from "../graph";
 import { detect } from "package-manager-detector";
 import type { PackagePlanStore, PlanStore } from "../plans/store";
 import type { BumpType } from "../utils/semver";
+import type { PlanPolicy } from "../plans/draft";
 
 const DEP_FIELDS = [
   "dependencies",
@@ -223,6 +224,35 @@ export function npm({
     });
   }
 
+  function depsPolicy({ graph }: TegamiContext): PlanPolicy {
+    return {
+      id: "npm:deps",
+      onUpdate({ pkg, plan }) {
+        for (const other of graph.getPackages()) {
+          if (!(other instanceof NpmPackage)) continue;
+
+          for (const field of DEP_FIELDS) {
+            const dependencies = other.manifest[field];
+            if (!dependencies) continue;
+
+            for (const [k, v] of Object.entries(dependencies)) {
+              const spec = parseNpmDependency(k, v);
+              if (!spec || pkg.id !== `npm:${spec.name}`) continue;
+
+              const result = updateRange(spec, plan.bumpVersion(pkg));
+              if (result === false) continue;
+
+              const bumpType = getBumpDepType({ kind: field, spec });
+              if (bumpType === false) continue;
+
+              this.bumpPackage(other, { type: bumpType, reason: `update dependency "${k}"` });
+            }
+          }
+        }
+      },
+    };
+  }
+
   return {
     name: "npm",
     enforce: "pre",
@@ -244,24 +274,23 @@ export function npm({
     createRegistryClient() {
       return new NpmRegistryClient(this.cwd, client, this.graph);
     },
+    initPlan(plan) {
+      plan.addPolicy(depsPolicy(this));
+    },
     async applyPlan(draft) {
       const { graph } = this;
-      const bumpedPackages = new Map<NpmPackage, { $updateVersion: string | null }>();
       const writes: Awaitable<void>[] = [];
 
-      const calc = (pkg: NpmPackage) => {
-        const bumpedVersion = draft.getPackagePlan(pkg.id)?.bumpVersion(pkg);
-        return {
-          $updateVersion: bumpedVersion && bumpedVersion !== pkg.version ? bumpedVersion : null,
-        };
-      };
+      for (const pkg of graph.getPackages()) {
+        if (!(pkg instanceof NpmPackage)) continue;
+        const plan = draft.getPackagePlan(pkg.id);
+        if (plan) {
+          pkg.manifest.version = plan.bumpVersion(pkg);
+        }
+      }
 
-      const bumpDeps = (pkg: NpmPackage) => {
-        const existing = bumpedPackages.get(pkg);
-        if (existing) return existing;
-
-        // handle recursive
-        bumpedPackages.set(pkg, calc(pkg));
+      for (const pkg of graph.getPackages()) {
+        if (!(pkg instanceof NpmPackage)) continue;
 
         for (const field of DEP_FIELDS) {
           const dependencies = pkg.manifest[field];
@@ -273,33 +302,15 @@ export function npm({
 
             const linked = graph.get(`npm:${spec.name}`);
             if (!linked || !(linked instanceof NpmPackage)) continue;
-            const next = bumpDeps(linked).$updateVersion;
-            if (!next) continue;
 
-            const result = updateRange(spec, next);
+            const result = updateRange(spec, linked.version);
             if (result === false) continue;
 
             dependencies[k] = result;
-
-            const bumpType = getBumpDepType({ kind: field, spec });
-            if (bumpType === false) continue;
-
-            draft.bumpPackage(pkg, { type: bumpType, reason: `update dependency "${k}"` });
           }
         }
 
-        const result = calc(pkg);
-        bumpedPackages.set(pkg, result);
-        if (result.$updateVersion) {
-          pkg.manifest.version = result.$updateVersion;
-        }
-
         writes.push(pkg.write());
-        return result;
-      };
-
-      for (const pkg of graph.getPackages()) {
-        if (pkg instanceof NpmPackage) bumpDeps(pkg);
       }
 
       await Promise.all(writes);

@@ -8,6 +8,7 @@ import type { ChangelogEntry } from "../changelog/parse";
 import { createPlanStore, PlanStore, readPlanStore } from "./store";
 import type { Awaitable, PublishPlanStatus } from "../types";
 import { handlePluginError } from "../utils/error";
+import { groupPolicy } from "./policy";
 
 export interface PackagePlan {
   type?: BumpType;
@@ -22,6 +23,7 @@ export interface PackagePlan {
     distTag?: string;
   };
 
+  /** get the bumped version of a package */
   bumpVersion: (pkg: WorkspacePackage) => string;
 }
 
@@ -31,8 +33,11 @@ export class DraftPlan {
   private readonly packages = new Map<string, PackagePlan>();
   // id -> changelog
   private readonly changelogs = new Map<string, ChangelogEntry>();
+  private readonly policies: PlanPolicy[] = [];
 
-  constructor(private readonly context: TegamiContext) {}
+  constructor(private readonly context: TegamiContext) {
+    this.policies.push(groupPolicy(context));
+  }
 
   getPackagePlans() {
     return this.packages;
@@ -48,10 +53,17 @@ export class DraftPlan {
       plan = this.initPackagePlan(pkg);
       this.packages.set(pkg.id, plan);
     }
+    const prevVersion = plan.bumpVersion(pkg);
     plan.type = plan.type ? maxBump(plan.type, type) : type;
     if (reason) {
       plan.bumpReasons ??= [];
       plan.bumpReasons.push(reason);
+    }
+
+    if (prevVersion !== plan.bumpVersion(pkg)) {
+      for (const policy of this.policies) {
+        policy.onUpdate?.call(this, { plan, pkg });
+      }
     }
 
     return plan;
@@ -119,47 +131,34 @@ export class DraftPlan {
       );
     }
 
-    this.applyGroupPolicy();
-
     const { graph } = this.context;
     const writes: Awaitable<void>[] = [];
+
     for (const [id, packagePlan] of this.packages) {
       const pkg = graph.get(id);
       if (!pkg) continue;
       writes.push(this.appendChangelog(pkg, packagePlan));
     }
-    await Promise.all(writes);
 
+    for (const entry of this.changelogs.values()) {
+      writes.push(rm(path.join(this.context.changelogDir, entry.filename), { force: true }));
+    }
+
+    await Promise.all(writes);
     await mkdir(dirname(this.context.planPath), { recursive: true });
     await writeFile(this.context.planPath, createPlanStore(this, this.context));
-    await this.removeConsumedChangelogs();
   }
 
-  private applyGroupPolicy() {
-    const { graph } = this.context;
-
-    for (const group of graph.getGroups()) {
-      if (!group.options.syncBump || group.packages.length <= 1) continue;
-
-      let bumpType: BumpType | undefined;
-      for (const member of group.packages) {
-        const pkgPlan = this.packages.get(member.id);
-        if (!pkgPlan?.type) continue;
-
-        bumpType = bumpType ? maxBump(bumpType, pkgPlan.type) : pkgPlan.type;
-      }
-
-      if (!bumpType) continue;
-      for (const member of group.packages) {
-        this.bumpPackage(member, {
-          type: bumpType,
-          reason: "sync group package versions",
-        });
-      }
-    }
+  addPolicy(policy: PlanPolicy) {
+    this.policies.push(policy);
   }
 
-  editable() {
+  removePolicy(policy: PlanPolicy) {
+    const idx = this.policies.indexOf(policy);
+    if (idx !== -1) this.policies.splice(idx, 1);
+  }
+
+  canApply() {
     return !this.#applied;
   }
 
@@ -170,18 +169,9 @@ export class DraftPlan {
 
     if (status.state === "pending") {
       throw new Error(
-        "Publish plan already exists at ${this.context.planPath} and is pending. Publish it before applying a new plan.",
+        `Publish plan already exists at ${this.context.planPath} and is pending. Publish it before applying a new plan.`,
       );
     }
-  }
-
-  private async removeConsumedChangelogs() {
-    const writes: Promise<void>[] = [];
-    for (const entry of this.changelogs.values()) {
-      const file = path.resolve(this.context.changelogDir, entry.filename);
-      writes.push(rm(file, { force: true }));
-    }
-    await Promise.all(writes);
   }
 
   private async appendChangelog(pkg: WorkspacePackage, plan: PackagePlan): Promise<void> {
@@ -235,6 +225,11 @@ export async function publishPlanStatus(
   return status;
 }
 
+export interface PlanPolicy {
+  id: string;
+  onUpdate?: (this: DraftPlan, opts: { plan: PackagePlan; pkg: WorkspacePackage }) => void;
+}
+
 export type CleanupResult =
   | {
       state: "removed";
@@ -265,15 +260,15 @@ export async function createDraftPlan(
 ): Promise<DraftPlan> {
   let draft = new DraftPlan(context);
 
-  for (const entry of changelogs) {
-    draft.addChangelog(entry);
-  }
-
   for (const plugin of context.plugins) {
-    const next = await handlePluginError(plugin, "initPlan", () =>
+    const result = await handlePluginError(plugin, "initPlan", () =>
       plugin.initPlan?.call(context, draft),
     );
-    draft = next ?? draft;
+    if (result) draft = result;
+  }
+
+  for (const entry of changelogs) {
+    draft.addChangelog(entry);
   }
 
   return draft;

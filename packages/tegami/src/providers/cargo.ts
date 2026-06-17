@@ -5,7 +5,7 @@ import { parse, stringify, type TomlTable, type TomlValue } from "smol-toml";
 import { glob } from "tinyglobby";
 import { x } from "tinyexec";
 import type { TegamiContext } from "../context";
-import type { DraftPlan } from "../plans/draft";
+import type { PlanPolicy } from "../plans/draft";
 import type { Awaitable, TegamiPlugin, RegistryClient } from "../types";
 import { isNodeError } from "../utils/error";
 import { PackageGraph, WorkspacePackage } from "../graph";
@@ -25,7 +25,7 @@ export class CargoPackage extends WorkspacePackage {
   }
 
   get name(): string {
-    return stringValue(this.packageInfo.name)!;
+    return this.packageInfo.name as string;
   }
 
   get version(): string {
@@ -42,8 +42,9 @@ export class CargoPackage extends WorkspacePackage {
     await writeFile(join(this.path, "Cargo.toml"), stringify(this.manifest));
   }
 
-  private get packageInfo(): TomlTable {
-    return tableValue(this.manifest.package) ?? {};
+  get packageInfo(): TomlTable {
+    this.manifest.package ??= {};
+    return this.manifest.package as TomlTable;
   }
 
   private get workspaceVersion(): string | undefined {
@@ -121,6 +122,35 @@ export function cargo({
     return next;
   }
 
+  function depsPolicy({ graph }: TegamiContext): PlanPolicy {
+    return {
+      id: "cargo:deps",
+      onUpdate({ pkg, plan }) {
+        for (const other of graph.getPackages()) {
+          if (!(other instanceof CargoPackage)) continue;
+
+          for (const { table, kind } of dependencyTables(other.manifest)) {
+            for (const [rawName, rawSpec] of Object.entries(table)) {
+              const spec = parseSpec(rawSpec);
+              if (!spec) continue;
+
+              const packageName = spec.package ?? rawName;
+              if (pkg.id !== `cargo:${packageName}`) continue;
+
+              const result = updateRange(spec.version, plan.bumpVersion(pkg));
+              if (result === false) continue;
+
+              const bumpType = getBumpDepType({ kind, name: packageName, version: spec.version });
+              if (bumpType === false) continue;
+
+              this.bumpPackage(other, { type: bumpType, reason: `update dependency "${rawName}"` });
+            }
+          }
+        }
+      },
+    };
+  }
+
   return {
     name: "cargo",
     enforce: "pre",
@@ -130,71 +160,42 @@ export function cargo({
     createRegistryClient() {
       return new CargoRegistryClient(this.graph);
     },
-    async applyPlan(draft: DraftPlan) {
+    initPlan(plan) {
+      plan.addPolicy(depsPolicy(this));
+    },
+    async applyPlan(draft) {
       const { graph } = this;
-      const bumpedPackages = new Map<CargoPackage, { $updateVersion: string | null }>();
       const writes: Awaitable<void>[] = [];
 
-      const calc = (pkg: CargoPackage) => {
-        const bumpedVersion = draft.getPackagePlan(pkg.id)?.bumpVersion(pkg);
-        return {
-          $updateVersion: bumpedVersion && pkg.version !== bumpedVersion ? bumpedVersion : null,
-        };
-      };
+      for (const pkg of graph.getPackages()) {
+        if (!(pkg instanceof CargoPackage)) continue;
 
-      const bumpDeps = (pkg: CargoPackage) => {
-        const existing = bumpedPackages.get(pkg);
-        if (existing) return existing;
+        const plan = draft.getPackagePlan(pkg.id);
+        if (plan) {
+          pkg.packageInfo.version = plan.bumpVersion(pkg);
+        }
+      }
 
-        // handle recursive
-        bumpedPackages.set(pkg, calc(pkg));
+      for (const pkg of graph.getPackages()) {
+        if (!(pkg instanceof CargoPackage)) continue;
 
-        for (const { table, kind } of dependencyTables(pkg.manifest)) {
+        for (const { table } of dependencyTables(pkg.manifest)) {
           for (const [rawName, rawSpec] of Object.entries(table)) {
-            const spec = tableValue(rawSpec);
-            const packageName = stringValue(spec?.package) ?? rawName;
+            const spec = parseSpec(rawSpec);
+            if (!spec) continue;
 
+            const packageName = spec.package ?? rawName;
             const linked = graph.get(`cargo:${packageName}`);
             if (!linked || !(linked instanceof CargoPackage)) continue;
-            const next = bumpDeps(linked).$updateVersion;
-            if (!next) continue;
-            let version: string | undefined;
 
-            if (typeof rawSpec === "string") {
-              version = rawSpec;
-            } else if (spec) {
-              version = stringValue(spec.version);
-            }
-
-            if (version === undefined) continue;
-            const result = updateRange(version, next);
+            const result = updateRange(spec.version, linked.version);
             if (result === false) continue;
 
-            if (typeof rawSpec === "string") {
-              table[rawName] = result;
-            } else if (spec) {
-              spec.version = result;
-            }
-
-            const bumpType = getBumpDepType({ kind, name: packageName, version });
-            if (bumpType === false) continue;
-
-            draft.bumpPackage(pkg, { type: bumpType, reason: `update dependency "${rawName}"` });
+            table[rawName] = spec.setVersion(result);
           }
         }
 
-        const result = calc(pkg);
-        bumpedPackages.set(pkg, result);
-        if (result.$updateVersion) {
-          tableValue(pkg.manifest.package)!.version = result.$updateVersion;
-        }
-
         writes.push(pkg.write());
-        return result;
-      };
-
-      for (const pkg of graph.getPackages()) {
-        if (pkg instanceof CargoPackage) bumpDeps(pkg);
       }
 
       await Promise.all(writes);
@@ -297,8 +298,33 @@ function dependencyTables(manifest: TomlTable) {
   return tables;
 }
 
+function parseSpec(v: TomlValue) {
+  if (typeof v === "string") {
+    return {
+      version: v,
+      setVersion(version: string) {
+        return version;
+      },
+    };
+  }
+
+  if (isTableValue(v)) {
+    return {
+      package: stringValue(v.package),
+      version: v.version as string,
+      setVersion(version: string) {
+        return { ...v, version };
+      },
+    };
+  }
+}
+
 async function readCargoManifest(path: string): Promise<TomlTable> {
   return parse(await readFile(join(path, "Cargo.toml"), "utf8"));
+}
+
+function isTableValue(value: TomlValue): value is TomlTable {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function tableValue(value: TomlValue | undefined): TomlTable | undefined {
