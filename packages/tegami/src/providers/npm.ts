@@ -13,6 +13,7 @@ import { detect } from "package-manager-detector";
 import type { PackagePlanStore, PlanStore } from "../plans/store";
 import type { BumpType } from "../utils/semver";
 import type { PlanPolicy } from "../plans/draft";
+import type { AgentName } from "package-manager-detector";
 
 const DEP_FIELDS = [
   "dependencies",
@@ -32,7 +33,7 @@ export class NpmPackage extends WorkspacePackage {
   }
 
   get name(): string {
-    return this.manifest.name!;
+    return this.manifest.name;
   }
 
   get version(): string {
@@ -56,8 +57,6 @@ export class NpmPackage extends WorkspacePackage {
   }
 }
 
-type NpmClient = "npm" | "pnpm";
-
 export class NpmRegistryClient implements RegistryClient {
   readonly id = "npm";
 
@@ -66,7 +65,7 @@ export class NpmRegistryClient implements RegistryClient {
 
   constructor(
     private readonly cwd: string,
-    private readonly client: NpmClient,
+    private readonly client: AgentName,
     _graph: PackageGraph,
   ) {}
 
@@ -83,7 +82,8 @@ export class NpmRegistryClient implements RegistryClient {
         const args = ["view", `${pkg.name}@${pkg.version}`, "version", "--json"];
         if (registry) args.push("--registry", registry);
 
-        const result = await x(this.client, args, {
+        const client = this.client === "pnpm" ? "pnpm" : "npm";
+        const result = await x(client, args, {
           nodeOptions: {
             cwd: this.cwd,
           },
@@ -112,9 +112,10 @@ export class NpmRegistryClient implements RegistryClient {
     const args = ["publish"];
     const distTag = packageStore.npm?.distTag;
     if (distTag) args.push("--tag", distTag);
-    if (this.client === "pnpm") args.push("--no-git-checks");
+    const client = this.client === "pnpm" ? "pnpm" : "npm";
 
-    const result = await x(this.client, args, {
+    if (client === "pnpm") args.push("--no-git-checks");
+    const result = await x(client, args, {
       nodeOptions: {
         cwd: pkg.path,
       },
@@ -204,7 +205,7 @@ function formatDependencySpec(spec: DependencySpec): string {
 
 export interface NpmPluginOptions {
   /** Package manager command used for npm registry operations. */
-  client?: NpmClient;
+  client?: AgentName;
 
   /**
    * Decide how to bump the dependents of a bumped package.
@@ -225,11 +226,15 @@ export interface NpmPluginOptions {
    * Note: `workspace:` protocols are not included.
    */
   onBreakPeerDep?: "set" | "error" | "ignore";
+
+  /** update lockfile after appling publish plan */
+  updateLockFile?: boolean;
 }
 
 export function npm({
   client: defaultClient,
   onBreakPeerDep = "set",
+  updateLockFile = false,
   bumpDep: getBumpDepType = ({ kind }) => {
     switch (kind) {
       case "dependencies":
@@ -243,7 +248,7 @@ export function npm({
     }
   },
 }: NpmPluginOptions = {}): TegamiPlugin {
-  let client: NpmClient;
+  let client: AgentName;
 
   function depsPolicy(context: TegamiContext): PlanPolicy {
     const { graph } = context;
@@ -379,6 +384,29 @@ export function npm({
       }
 
       await Promise.all(writes);
+    },
+    cli: {
+      async publishPlanApplied() {
+        if (!updateLockFile) return;
+
+        let args: string[];
+        if (client === "npm") {
+          args = ["ci"];
+        } else if (client === "yarn") {
+          args = ["install", "--immutable"];
+        } else {
+          args = ["install", "--frozen-lockfile"];
+        }
+
+        const result = await x(client, args, {
+          nodeOptions: {
+            cwd: this.cwd,
+          },
+        });
+        if (result.exitCode !== 0) {
+          throw execFailure("Failed to update lockfile.", result);
+        }
+      },
     },
   };
 }

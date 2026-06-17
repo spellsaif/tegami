@@ -2,6 +2,7 @@ import type { TegamiContext } from "./context";
 import type { ChangelogEntry } from "./changelog/parse";
 import type { PlanStore } from "./plans/store";
 import { publishPlanStatus } from "./plans/checks";
+import { handlePluginError } from "./utils/error";
 
 export interface PublishOptions {
   /** Validate the publish plan without publishing packages, creating tags, or running release plugins. */
@@ -95,6 +96,12 @@ export async function publishFromPlan(
 
     try {
       if (!dryRun) {
+        for (const plugin of context.plugins) {
+          await handlePluginError(plugin, "willPublish", () =>
+            plugin.willPublish?.call(context, { pkg }),
+          );
+        }
+
         await context.getRegistryClient(pkg).publish(pkg, { packageStore: plan, store });
       }
 

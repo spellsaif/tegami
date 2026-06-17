@@ -99,6 +99,12 @@ export interface TegamiPlugin {
     },
   ): Awaitable<PublishPlanStatus>;
 
+  /** Called before a package will be published. */
+  willPublish?(
+    this: TegamiContext,
+    opts: { pkg: WorkspacePackage },
+  ): Awaitable<PublishResult | void | undefined>;
+
   /** Called after publishing finishes. */
   afterPublish?(
     this: TegamiContext & { publishOptions: PublishOptions },
