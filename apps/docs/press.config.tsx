@@ -8,7 +8,7 @@ import { docs } from "./.source/server";
 export default defineConfig({
   content: docs.toFumadocsSource(),
   site: {
-    name: "Fumapress",
+    name: "Tegami",
   },
 })
   .plugins(flexsearchPlugin(), llmsPlugin(), takumiPlugin())

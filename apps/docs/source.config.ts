@@ -1,4 +1,5 @@
-import { defineDocs } from "fumadocs-mdx/config";
+import { remarkSteps } from "fumadocs-core/mdx-plugins";
+import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 import { metaSchema, pageSchema } from "fumapress/adapters/mdx/schema";
 
 export const docs = defineDocs({
@@ -12,5 +13,11 @@ export const docs = defineDocs({
   },
   meta: {
     schema: metaSchema,
+  },
+});
+
+export default defineConfig({
+  mdxOptions: {
+    remarkPlugins: [remarkSteps],
   },
 });
