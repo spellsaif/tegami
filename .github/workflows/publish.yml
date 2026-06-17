@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish packages
-        run: pnpm run release
+      - name: Version & publish packages
+        run: pnpm tegami ci
         env:
           GITHUB_TOKEN: ${{ github.token }}

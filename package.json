@@ -9,10 +9,7 @@
     "format": "oxfmt",
     "test": "vitest",
     "types:check": "turbo run types:check",
-    "tegami": "pnpm --filter tegami build && node scripts/tegami.mts",
-    "changelog": "pnpm --filter tegami build && node scripts/tegami.mts",
-    "version": "pnpm --filter tegami build && node scripts/tegami.mts version",
-    "release": "pnpm --filter tegami build && node scripts/tegami.mts publish"
+    "tegami": "pnpm --filter tegami build && node scripts/tegami.mts"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
