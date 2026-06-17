@@ -17,6 +17,7 @@ import type { Awaitable } from "../types";
 import type { BumpType } from "../utils/semver";
 import { isCI } from "../utils/constants";
 import { handlePluginError } from "../utils/error";
+import { assertPublishPlanFinished } from "../plans/checks";
 
 export interface TegamiCLIOptions {
   /** create a custom draft plan, it must not be applied */
@@ -75,9 +76,11 @@ async function createChangelogs(
   tegami: Tegami,
   _options: ChangelogCommandOptions & { cli: TegamiCLIOptions },
 ): Promise<void> {
+  const context = await tegami._internal.context();
+  await assertPublishPlanFinished(context);
+
   intro("Create changelogs");
-  const { graph, changelogDir } = await tegami._internal.context();
-  const packages = graph.getPackages();
+  const packages = context.graph.getPackages();
   let selectedPackages: string[] = [];
 
   if (isCI()) {
@@ -153,13 +156,12 @@ async function createChangelogs(
   if (isCancel(message)) throw new CancelledError();
 
   const filename = changelogFilename();
-  const directory = changelogDir;
 
   const s = spinner();
   s.start("Creating changelog");
-  await mkdir(directory, { recursive: true });
+  await mkdir(context.changelogDir, { recursive: true });
   await writeFile(
-    join(directory, filename),
+    join(context.changelogDir, filename),
     renderManualChangelog(selectedPackages, type, message.trim()),
   );
   s.stop("Created changelog file");
@@ -187,7 +189,7 @@ async function versionPackages(
     );
   }
 
-  if (draft.hasPending()) {
+  if (!draft.hasPending()) {
     note("No pending changelog entries matched workspace packages.", "Nothing to version");
     outro("No versions changed.");
     return;

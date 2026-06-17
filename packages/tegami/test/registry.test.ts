@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { x } from "tinyexec";
 import { createTegamiContext } from "../src/context";
-import { publishPlanStatus } from "../src/plans/draft";
+import { publishPlanStatus } from "../src/plans/checks";
 import type { PlanStore } from "../src/plans/store";
 import { readPlanStore } from "../src/plans/store";
 import { NpmPackage, NpmRegistryClient } from "../src/providers/npm";

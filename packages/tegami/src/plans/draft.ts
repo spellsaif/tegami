@@ -5,10 +5,11 @@ import { simpleGenerator } from "../generators/simple";
 import { BumpType, maxBump } from "../utils/semver";
 import type { WorkspacePackage } from "../graph";
 import type { ChangelogEntry } from "../changelog/parse";
-import { createPlanStore, PlanStore, readPlanStore } from "./store";
-import type { Awaitable, PublishPlanStatus } from "../types";
+import { createPlanStore, readPlanStore } from "./store";
+import type { Awaitable } from "../types";
 import { handlePluginError } from "../utils/error";
 import { groupPolicy } from "./policy";
+import { publishPlanStatus, assertPublishPlanFinished } from "./checks";
 
 export interface PackagePlan {
   type?: BumpType;
@@ -122,8 +123,8 @@ export class DraftPlan {
     if (this.#applied) {
       throw new Error("This draft has already applied a publish plan.");
     }
+    await assertPublishPlanFinished(this.context);
     this.#applied = true;
-    await this.assertPublishPlanFinished();
 
     for (const plugin of this.context.plugins) {
       await handlePluginError(plugin, "applyPlan", () =>
@@ -162,18 +163,6 @@ export class DraftPlan {
     return !this.#applied;
   }
 
-  private async assertPublishPlanFinished(): Promise<void> {
-    const store = await readPlanStore(this.context);
-    if (!store) return;
-    const status = await publishPlanStatus(store, this.context);
-
-    if (status.state === "pending") {
-      throw new Error(
-        `Publish plan already exists at ${this.context.planPath} and is pending. Publish it before applying a new plan.`,
-      );
-    }
-  }
-
   private async appendChangelog(pkg: WorkspacePackage, plan: PackagePlan): Promise<void> {
     if (!plan.changelogs || plan.changelogs.length === 0) return;
     const { generator = simpleGenerator() } = this.context.options;
@@ -197,32 +186,6 @@ export class DraftPlan {
   async [Symbol.asyncDispose]() {
     return this.applyPlan();
   }
-}
-
-export async function publishPlanStatus(
-  store: PlanStore,
-  context: TegamiContext,
-): Promise<PublishPlanStatus> {
-  async function defaultStatus(): Promise<PublishPlanStatus> {
-    for (const [id, pkgPlan] of Object.entries(store.packages)) {
-      const pkg = context.graph.get(id);
-      if (!pkg || !pkgPlan.publish) continue;
-
-      const published = await context.getRegistryClient(pkg).isPackagePublished(pkg);
-      if (!published) return { state: "pending" };
-    }
-
-    return { state: "success" };
-  }
-
-  let status = await defaultStatus();
-  for (const plugin of context.plugins) {
-    const resolved = await handlePluginError(plugin, "resolvePlanStatus", () =>
-      plugin.resolvePlanStatus?.call(context, status, { plan: store }),
-    );
-    if (resolved) status = resolved;
-  }
-  return status;
 }
 
 export interface PlanPolicy {

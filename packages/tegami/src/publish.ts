@@ -1,7 +1,7 @@
 import type { TegamiContext } from "./context";
 import type { ChangelogEntry } from "./changelog/parse";
 import type { PlanStore } from "./plans/store";
-import { publishPlanStatus } from "./plans/draft";
+import { publishPlanStatus } from "./plans/checks";
 
 export interface PublishOptions {
   /** Validate the publish plan without publishing packages, creating tags, or running release plugins. */

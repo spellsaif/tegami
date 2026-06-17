@@ -8,6 +8,8 @@ export default defineConfig({
     "src/plugins/*",
     "src/providers/*",
   ],
+  platform: "node",
+  fixedExtension: false,
   target: "es2023",
   dts: {
     sourcemap: false,
