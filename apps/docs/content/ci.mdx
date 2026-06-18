@@ -37,6 +37,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # see the "Build packages" section below for details
+      - name: Build packages
+        run: pnpm build
+
       - name: Version & publish packages
         run: pnpm tegami ci
         env:
@@ -46,6 +50,44 @@ jobs:
 Set `id-token: write` so npm trusted publishing (OIDC) works without an `NPM_TOKEN`.
 
 The [GitHub plugin](/plugins/github) requires `GITHUB_TOKEN` to open pull requests and create GitHub releases after publish.
+
+### Build packages
+
+Tegami does not build your packages, registries publish whatever is on disk.
+
+The example above runs `pnpm build` before every `tegami ci` invocation, this will always build all packages before they are published.
+
+To build only packages that are about to be published, use a `willPublish` plugin. For example, using [tinyexec](https://github.com/tinylibs/tinyexec) and Turborepo:
+
+```ts title="scripts/tegami.mts"
+import { x } from "tinyexec";
+import { tegami } from "tegami";
+import type { TegamiPlugin } from "tegami";
+
+function buildOnPublish(): TegamiPlugin {
+  return {
+    name: "build-on-publish",
+    async willPublish({ pkg }) {
+      const result = await x("turbo", ["run", "build", "--filter", pkg.name], {
+        nodeOptions: { cwd: this.cwd },
+      });
+
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to build ${pkg.name}`);
+      }
+    },
+  };
+}
+
+const paper = tegami({
+  // [!code +]
+  plugins: [buildOnPublish()],
+});
+```
+
+`willPublish` runs once per package right before it is published. Turborepo's `--filter` scopes the build to that package and its dependencies.
+
+With this plugin, you can remove the standalone build step from your workflow and rely on `tegami ci` to build each package at publish time.
 
 ## Recommended release flow
 
