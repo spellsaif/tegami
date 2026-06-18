@@ -17,6 +17,7 @@ export interface ChangelogEntry {
   packages: Map<string, BumpType>;
   /** will not be empty */
   sections: {
+    depth: number;
     title: string;
     content: string;
   }[];
@@ -69,6 +70,7 @@ export function parseChangelogFile(file: string, content: string): ChangelogEntr
     }
 
     sections.push({
+      depth: section.heading.depth,
       title: headingText(section.heading),
       content: sectionToMarkdown(section.children),
     });

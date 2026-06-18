@@ -1,0 +1,29 @@
+---
+title: Cargo
+description: Rust workspace support and crates.io publishing.
+---
+
+The Cargo plugin is enabled by default. It discovers workspace members from `Cargo.toml`, bumps versions, updates dependency ranges, and publishes to crates.io.
+
+## Discovery
+
+Tegami reads the root `Cargo.toml` and expands `[workspace].members` (respecting `exclude`). Packages need a `name` and `version` — either in the crate manifest or inherited from `[workspace.package]`.
+
+## Configuration
+
+```ts
+const paper = tegami({
+  cargo: {
+    bumpDep: ({ kind }) => (kind === "dependencies" ? "patch" : false),
+  },
+});
+```
+
+| Option    | Description                                          |
+| --------- | ---------------------------------------------------- |
+| `bumpDep` | Decide how to bump dependents when a crate is bumped |
+
+Default behavior:
+
+- `dependencies` → patch bump on the dependent
+- `build-dependencies` and `dev-dependencies` → no automatic bump

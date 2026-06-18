@@ -1,0 +1,82 @@
+---
+title: Programmatic API
+description: Use Tegami from scripts and custom tooling.
+---
+
+## Introduction
+
+`tegami()` returns a handle with four methods that cover the full release cycle.
+
+```ts
+import { tegami } from "tegami";
+
+const paper = tegami({
+  cwd: process.cwd(),
+});
+```
+
+### `generateChangelog()`
+
+Create pending changelog files from git commit history since the latest tag:
+
+```ts
+const created = await paper.generateChangelog();
+```
+
+You can also author changelog files manually — see [Changelogs](/changelog).
+
+### `draft()`
+
+Build a draft plan from pending changelog files:
+
+```ts
+const draft = await paper.draft();
+
+for (const [id, plan] of draft.getPackagePlans()) {
+  console.log(id, plan.type);
+}
+
+await draft.applyPlan();
+```
+
+The draft supports `await using` for automatic apply:
+
+```ts
+await using draft = await paper.draft();
+// applyPlan() runs when the block exits
+```
+
+### `publish()`
+
+Publish packages from the committed publish plan:
+
+```ts
+const result = await paper.publish();
+
+if (result.state === "created") {
+  for (const pkg of result.packages) {
+    if (pkg.state === "success") {
+      console.log(`Published ${pkg.name}@${pkg.version}`);
+    }
+  }
+}
+```
+
+Pass `{ dryRun: true }` to validate without touching registries.
+
+### `cleanup()`
+
+Optionally remove a finished publish plan file:
+
+```ts
+const result = await paper.cleanup();
+// { state: "removed" } or { state: "skipped", reason: "missing" | "pending" }
+```
+
+Only succeeds when every package in the plan has already published. Pending plans are left in place. This is housekeeping only — Tegami does not use a finished plan for publishing or versioning.
+
+## Configurations
+
+<auto-type-table type="import('tegami').TegamiOptions" />
+
+See [Plugins](/plugins) and [Package Groups](/package-groups) for option details.

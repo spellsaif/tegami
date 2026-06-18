@@ -1,0 +1,76 @@
+---
+title: Changelogs
+description: The format of changelog files.
+---
+
+Changelog files describe **what changed** and **which packages** are affected. Tegami reads pending files from `.tegami/` (configurable via `changelogDir`) when you run `tegami version`.
+
+## Styles
+
+Tegami allows different input styles according to your preference.
+
+### Explicit
+
+List the bump type for each package in frontmatter:
+
+```md title=".tegami/my-change.md"
+---
+packages:
+  "@acme/ui": minor
+  "@acme/utils": patch
+---
+
+## Fix button hover state
+
+The hover color now matches the design system.
+```
+
+### Implicit
+
+List affected packages and use heading depth to determine bump types:
+
+```md title=".tegami/my-change.md"
+---
+packages: ["@acme/ui", "@acme/utils"]
+---
+
+# Breaking API change
+
+Removed deprecated props.
+
+## Add dark mode
+
+New theme tokens for dark surfaces.
+
+### Fix typo in docs
+```
+
+Heading depth maps to bump type:
+
+| Heading | Bump  |
+| ------- | ----- |
+| `#`     | major |
+| `##`    | minor |
+| `###`   | patch |
+
+With implicit style, all listed packages receive the highest bump type found in the file.
+
+### Generate from commits
+
+Run `tegami` without selecting packages to draft changelogs from conventional commits since the latest tag:
+
+```bash
+pnpm tegami
+```
+
+## Package references
+
+Values in `packages` can be:
+
+| Reference    | Example          | Resolves to                          |
+| ------------ | ---------------- | ------------------------------------ |
+| Package name | `"@acme/ui"`     | All packages with that name          |
+| Package ID   | `"npm:@acme/ui"` | A specific package by manager + name |
+| Group        | `"group:acme"`   | Every package in the `acme` group    |
+
+Use package IDs when the same name appears in multiple registries (for example npm and Cargo). Use `group:` to target every member of a [package group](/package-groups).

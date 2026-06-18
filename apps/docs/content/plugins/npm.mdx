@@ -1,0 +1,67 @@
+---
+title: npm
+description: Node.js/npm workspace support.
+---
+
+The npm plugin is enabled by default. It discovers workspace packages, bumps versions in `package.json`, updates dependency ranges, and publishes to npm.
+
+## Discovery
+
+Tegami scans:
+
+- The root `package.json` (if present).
+- Workspace packages from `pnpm-workspace.yaml` or the `workspaces` field in the root manifest.
+
+Private packages are versioned but not published unless you set `publish: true` in `packages`.
+
+## Configuration
+
+Pass options through the top-level `npm` field:
+
+```ts
+const paper = tegami({
+  npm: {
+    client: "pnpm",
+    updateLockFile: true,
+    onBreakPeerDep: "set",
+  },
+});
+```
+
+| Option           | Default | Description                                                    |
+| ---------------- | ------- | -------------------------------------------------------------- |
+| `client`         | auto    | Package manager for registry operations (`npm`, `pnpm`)        |
+| `updateLockFile` | `false` | Run install after versioning to refresh the lockfile           |
+| `onBreakPeerDep` | `"set"` | When a peer dep constraint breaks: `set`, `error`, or `ignore` |
+
+## Dependency bumps
+
+When a package is bumped, the plugin may bump its dependents based on dependency kind:
+
+- `dependencies` and `optionalDependencies` → patch bump on the dependent
+- `devDependencies` → no automatic bump
+- `peerDependencies` → major bump (or handled by `onBreakPeerDep`)
+
+Customize this with `bumpDep`:
+
+```ts
+npm({
+  bumpDep: ({ kind }) => (kind === "dependencies" ? "patch" : false),
+});
+```
+
+## Package options
+
+It allows to override `distTag` for npm publish, otherwise, it will read from your `publishConfig` in `package.json`.
+
+```ts
+tegami({
+  packages: {
+    "@acme/ui": {
+      npm: {
+        distTag: "next",
+      },
+    },
+  },
+});
+```

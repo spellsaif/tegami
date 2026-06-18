@@ -1,0 +1,52 @@
+---
+title: Package Groups
+description: Version related packages together.
+---
+
+A **package group** links multiple workspace packages that should behave as one release unit. Assign packages to a group in your Tegami config; reference the group in changelogs with `group:<name>`.
+
+## Configure groups
+
+Define groups under `groups`, then assign packages with the `group` field:
+
+```ts title="scripts/tegami.mts"
+const paper = tegami({
+  groups: {
+    acme: {
+      prerelease: "alpha",
+      syncBump: true,
+      syncGitTag: true,
+    },
+  },
+  packages: {
+    "@acme/core": { group: "acme" },
+    "@acme/ui": { group: "acme" },
+  },
+});
+```
+
+## Options
+
+| Option       | Description                                                           |
+| ------------ | --------------------------------------------------------------------- |
+| `prerelease` | Prerelease tag shared by all members (e.g. `alpha` → `1.1.0-alpha.0`) |
+| `syncBump`   | When one member is bumped, all members receive the same bump type     |
+| `syncGitTag` | Create one git tag for the group instead of one tag per package       |
+
+Per-package settings still apply for options like `npm.distTag` or `publish: false`.
+
+### `syncGitTag`
+
+When `syncGitTag` is enabled, published packages in the group share one tag like `acme@2.0.0`. The [GitHub plugin](/plugins/github) creates a single release for grouped tags.
+
+Without `syncGitTag`, each package gets its own tag (`@acme/core@2.0.0`, `@acme/ui@2.0.0`).
+
+## When to use groups
+
+Groups work well for:
+
+- Packages that always ship together (e.g. a core library and its React bindings).
+- Prerelease channels where every package in a product line should stay on the same prerelease tag.
+- Monorepos that want one GitHub release per product instead of one per package.
+
+For dependency-only relationships, Tegami already bumps dependents automatically — groups are for coordinated release behavior, not dependency tracking.

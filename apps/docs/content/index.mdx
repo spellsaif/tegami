@@ -1,223 +1,39 @@
 ---
-title: Quick Start
-description: Install Tegami, configure your monorepo, and set up CI publishing
+title: Introduction
+description: Manage changelogs, versioning, and publishing for monorepos.
 ---
 
-Tegami manages versioning and publishing for monorepos. You describe changes in changelog files, Tegami turns them into a publish plan, bumps package versions, and publishes to registries like npm.
+Tegami manages changelogs, versioning, and publishing. Describe changes in changelog files, bump your packages, and publish to registries like npm and crates.io.
 
-This guide covers the programmatic API and a CI workflow using Tegami.
+## Release cycle
 
-## Install
+The workflow has three stages. Each stage maps to a CLI command or API method.
 
-```npm
-npm install tegami -D
-```
+### Changelogs [step]
 
-Add `-w` flag if you are running it in a monorepo.
+Create changelog files under `.tegami/` directory. Each file lists which packages changed and how.
 
-Tegami requires Node.js 24 or later.
+### Version [step]
 
-## Configure Tegami
-
-Create a small entry script in your repo root.
-
-```ts title="scripts/tegami.mts"
-#!/usr/bin/env node
-import { tegami } from "tegami";
-import { createCli } from "tegami/cli";
-import { github } from "tegami/plugins/github";
-
-const paper = tegami({
-  plugins: [
-    github({
-      repo: "your-org/your-repo",
-    }),
-  ],
-  packages: {
-    // optional: package settings
-    "your-package": {
-      prerelease: "beta",
-    },
-    // per registry:
-    "npm:your-package": {},
-    "cargo:your-package": {},
-  },
-});
-
-await createCli(paper).parseAsync();
-```
-
-Add a package script so the CLI is easy to run:
-
-```json title="package.json"
-{
-  "scripts": {
-    "tegami": "node scripts/tegami.mts"
-  }
-}
-```
-
-Tegami discovers npm and Cargo workspace packages automatically. Use the `packages` option to override release settings per package.
-
-## Programmatic API
-
-`tegami()` returns a handle with four main methods. Together they cover the full release cycle.
-
-### Create Changelogs [step]
-
-Write pending changelog files under `.tegami/` (configurable via `changelogDir`). You can author them manually or generate drafts from conventional commits.
-
-```ts
-const paper = tegami({});
-
-// Generate changelog files from git history since the latest tag
-const created = await paper.generateChangelog();
-```
-
-A manual changelog is a markdown file with frontmatter listing affected packages. Heading depth sets the semver bump: `#` major, `##` minor, `###` patch.
-
-```md title=".tegami/my-change.md"
----
-packages: ["@acme/ui"]
----
-
-## Fix button hover state
-
-The hover color now matches the design system.
-```
-
-### Draft and apply a publish plan [step]
-
-`draft()` reads pending changelogs and builds a mutable plan, it describes how packages are bumped & published.
-
-```ts
-const draft = await paper.draft();
-
-for (const [id, plan] of draft.getPackagePlans()) {
-  console.log(id, plan.type);
-}
-
-await draft.applyPlan();
-```
-
-When applied, a plan will bump versions, clean changelog files, and write `.tegami/publish-plan`.
-
-After apply, the plan is frozen. Tegami will not start a new versioning cycle until the current publish plan has finished publishing.
+Tegami reads pending changelogs, computes version bumps (including dependency updates), and writes a publish plan.
 
 ### Publish [step]
 
-`publish()` reads the committed publish plan, and publishes the pending packages. Safe to retry after partial CI failures.
+CI reads the publish plan and publishes packages to registries like npm and crates.io.
 
-```ts
-const result = await paper.publish();
+## Next steps
 
-if (result.state === "created") {
-  for (const pkg of result.packages) {
-    if (pkg.state === "success") {
-      console.log(`Published ${pkg.name}@${pkg.version}`);
-    }
-  }
-}
-```
-
-Pass `{ dryRun: true }` to validate the plan without touching registries.
-
-### Cleanup [step]
-
-Once every package in the plan is published, the publish plan file is no longer used.
-You can clean it using `cleanup()`.
-
-```ts
-await paper.cleanup();
-```
-
-## Setup CLI
-
-`createCli` wraps the programmatic API in a CLI. Pass the same `tegami()` instance you use in scripts.
-
-| Command          | Description                                                            |
-| ---------------- | ---------------------------------------------------------------------- |
-| `tegami`         | Create changelog files interactively or from conventional commits      |
-| `tegami version` | Draft and apply a publish plan                                         |
-| `tegami publish` | Publish packages from the applied plan                                 |
-| `tegami ci`      | (for CI pipeline) Version if changelogs are pending, otherwise publish |
-| `tegami cleanup` | Remove the publish plan after a successful publish                     |
-
-Locally, `tegami` and `tegami version` use interactive prompts. In CI (`CI=true`), prompts are skipped and commands run non-interactively.
-
-## CI setup
-
-The `tegami ci` command is designed for a release pipeline on your desired branch. It runs versioning first; only when there is nothing to version does it publish from the existing publish plan.
-
-### GitHub Actions
-
-A minimal publish workflow looks like this:
-
-```yaml title=".github/workflows/publish.yml"
-name: Publish
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Version & publish packages
-        run: pnpm tegami ci
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-```
-
-Set `id-token: write` so npm trusted publishing (OIDC) works without an `NPM_TOKEN`.
-
-The `github` plugin requires `GITHUB_TOKEN` to open pull requests, and create GitHub releases after publish.
-
-### Recommended release flow
-
-With the `github` plugin enabled, CI follows a two-step flow:
-
-1. **Changelogs committed**
-   - Maintainers push commits that add `.tegami/*.md` changelog files.
-   - CI runs `tegami ci`, applies the publish plan.
-   - CI opens a **Version Packages** pull request (at `tegami/version-packages` by default).
-2. **Version PR merges**
-   - The merged commit contains bumped versions and `.tegami/publish-plan`.
-   - The next CI runs publish, and creates GitHub releases for successfully published packages.
-
-Because the publish plan lives in git and publish skips versions already on the registry, failed publish jobs can be retried safely without duplicating releases.
-
-### Custom CLI hooks
-
-`createCli` accepts optional hooks to replace the default `draft()` or `publish()` behavior inside CLI commands:
-
-```ts
-createCli(paper, {
-  version: async () => {
-    const draft = await paper.draft();
-    // customize the draft before apply
-    return draft;
-  },
-  publish: async () => {
-    return paper.publish();
-  },
-});
-```
+<Cards>
+  <Card title="Getting Started" href="/getting-started">
+    Install Tegami, create a config script, and run your first release.
+  </Card>
+  <Card title="Changelogs" href="/changelog">
+    Learn the changelog file format and bump styles.
+  </Card>
+  <Card title="Package Groups" href="/package-groups">
+    Group packages that should release together.
+  </Card>
+  <Card title="CI Setup" href="/ci">
+    Run versioning and publishing in GitHub Actions.
+  </Card>
+</Cards>

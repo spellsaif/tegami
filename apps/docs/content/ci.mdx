@@ -1,0 +1,81 @@
+---
+title: CI Setup
+description: Run Tegami in your release pipeline.
+---
+
+The `tegami ci` command is designed for a release pipeline on your main branch. It runs versioning first; only when there is nothing to version does it publish from the existing publish plan.
+
+## GitHub Actions
+
+A minimal publish workflow:
+
+```yaml title=".github/workflows/publish.yml"
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Version & publish packages
+        run: pnpm tegami ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+```
+
+Set `id-token: write` so npm trusted publishing (OIDC) works without an `NPM_TOKEN`.
+
+The [GitHub plugin](/plugins/github) requires `GITHUB_TOKEN` to open pull requests and create GitHub releases after publish.
+
+## Recommended release flow
+
+With the GitHub plugin enabled, CI follows a two-step flow:
+
+1. **Changelogs committed**
+   - Maintainers push commits that add `.tegami/*.md` changelog files.
+   - CI runs `tegami ci`, applies the publish plan.
+   - CI opens a **Version Packages** pull request (at `tegami/version-packages` by default).
+2. **Version PR merges**
+   - The merged commit contains bumped versions and `.tegami/publish-plan`.
+   - The next CI run publishes packages and creates GitHub releases.
+
+Because the publish plan lives in git, failed publish jobs can be retried safely without duplicating releases.
+
+## Custom CLI hooks
+
+`createCli` accepts optional hooks to replace the default `draft()` or `publish()` behavior:
+
+```ts
+createCli(paper, {
+  version: async () => {
+    const draft = await paper.draft();
+    // customize the draft before apply
+    return draft;
+  },
+  publish: async () => {
+    return paper.publish();
+  },
+});
+```
+
+See the [programmatic API](/advanced/api) for lower-level control.

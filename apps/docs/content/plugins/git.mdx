@@ -1,0 +1,42 @@
+---
+title: Git
+description: Create git tags after publishing.
+---
+
+The git plugin creates and optionally pushes git tags when packages publish successfully.
+
+```ts
+import { git } from "tegami/plugins/git";
+
+const paper = tegami({
+  plugins: [git()],
+});
+```
+
+You do not need this plugin if you use the [GitHub plugin](/plugins/github), it includes git tag creation.
+
+## Options
+
+```ts
+git({
+  createTags: true,
+  pushTags: true,
+});
+```
+
+| Option       | Default      | Description                            |
+| ------------ | ------------ | -------------------------------------- |
+| `createTags` | `true`       | Create tags after a successful publish |
+| `pushTags`   | `true` in CI | Push created tags to `origin`          |
+
+## Tag format
+
+Each published package gets a tag like `@acme/ui@1.2.0`.
+
+When a package belongs to a group with `syncGitTag`, all members share one tag like `acme@1.2.0`. See [Package Groups](/package-groups).
+
+## CI setup
+
+In CI, the plugin configures the git user for GitHub Actions and pushes tags to `origin`. Ensure your workflow has `contents: write` permission.
+
+Tags are skipped when `publish({ dryRun: true })` is used.

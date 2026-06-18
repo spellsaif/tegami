@@ -1,0 +1,78 @@
+---
+title: Getting Started
+description: Install Tegami and configure your first release workflow.
+---
+
+## Install
+
+```npm
+npm install tegami -D
+```
+
+Add `-w` if you install from a monorepo workspace root.
+
+Tegami requires Node.js 24 or later.
+
+## Configure
+
+Create an entry script in your repo root.
+
+```ts title="scripts/tegami.mts"
+import { tegami } from "tegami";
+import { createCli } from "tegami/cli";
+import { github } from "tegami/plugins/github";
+
+const paper = tegami({
+  plugins: [
+    github({
+      repo: "your-org/your-repo",
+      cli: {
+        versionPr: {
+          base: "main",
+        },
+      },
+    }),
+  ],
+  packages: {
+    // optional: package options
+    "your-package": {},
+  },
+});
+
+void createCli(paper).parseAsync();
+```
+
+Add a package script so the CLI is easy to run:
+
+```json title="package.json"
+{
+  "scripts": {
+    "tegami": "node scripts/tegami.mts"
+  }
+}
+```
+
+Tegami discovers npm and Cargo workspace packages automatically. Use the `packages` option to override release settings per package.
+
+## CLI commands
+
+`createCli` wraps the programmatic API. Pass the same `tegami()` instance you use in scripts.
+
+| Command          | Description                                                       |
+| ---------------- | ----------------------------------------------------------------- |
+| `tegami`         | Create changelog files interactively or from conventional commits |
+| `tegami version` | Draft and apply a publish plan                                    |
+| `tegami publish` | Publish packages from the applied plan                            |
+| `tegami ci`      | Version if changelogs are pending, otherwise publish              |
+| `tegami cleanup` | Optionally remove a finished publish plan file from `.tegami/`    |
+
+Locally, `tegami` and `tegami version` use interactive prompts. In CI (`CI=true`), prompts are skipped and commands run non-interactively.
+
+## Typical local workflow
+
+1. Run `pnpm tegami` to create a changelog file (or write one manually under `.tegami/`).
+2. Commit the changelog and push.
+3. CI runs `tegami ci` to version packages and open a Version Packages pull request.
+4. Merge the version PR; the next CI run publishes packages.
+
+See [CI Setup](/ci) for a GitHub Actions workflow.

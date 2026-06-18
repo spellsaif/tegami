@@ -1,6 +1,7 @@
 import { remarkSteps } from "fumadocs-core/mdx-plugins";
 import { defineConfig, defineDocs } from "fumadocs-mdx/config";
 import { metaSchema, pageSchema } from "fumapress/adapters/mdx/schema";
+import { remarkAutoTypeTable } from "fumadocs-typescript";
 
 export const docs = defineDocs({
   dir: "content",
@@ -18,6 +19,6 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: [remarkSteps],
+    remarkPlugins: [remarkSteps, remarkAutoTypeTable],
   },
 });

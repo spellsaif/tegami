@@ -1,0 +1,43 @@
+---
+title: Plugins
+description: Extend Tegami with plugins.
+---
+
+## Introduction
+
+Plugins hook into Tegami's lifecycle, such as package discovery, versioning, publishing, and CLI commands.
+
+You can add other plugins from config:
+
+```ts
+import { tegami } from "tegami";
+
+const paper = tegami({
+  plugins: [
+    {
+      name: "my-plugin",
+      async init() {
+        console.log("init");
+      },
+    },
+  ],
+});
+```
+
+## Built-in plugins
+
+Tegami enables npm and Cargo support automatically. Configure them through top-level options:
+
+| Plugin | Role                                      |
+| ------ | ----------------------------------------- |
+| npm    | Discover npm/pnpm/yarn workspace packages |
+| cargo  | Discover Cargo workspace packages         |
+
+```ts
+const paper = tegami({
+  npm: {
+    updateLockFile: true,
+  },
+  cargo: {},
+});
+```
